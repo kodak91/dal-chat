@@ -141,8 +141,8 @@ export default function DalChat() {
   // storage 로드
   useEffect(() => {
     (async () => {
-      try { const r = await window.storage.get("dal:profile"); if(r) { const p=JSON.parse(r.value); setProfile(p); profileRef.current=p; } } catch {}
-      try { const r = await window.storage.get("dal:diaries"); if(r) setDiaries(JSON.parse(r.value)); } catch {}
+      try { const r = await Promise.resolve({value:localStorage.getItem("dal:profile")}); if(r) { const p=JSON.parse(r.value); setProfile(p); profileRef.current=p; } } catch {}
+      try { const r = await Promise.resolve({value:localStorage.getItem("dal:diaries")}); if(r) setDiaries(JSON.parse(r.value)); } catch {}
     })();
     taRef.current?.focus();
   }, []);
@@ -259,7 +259,7 @@ export default function DalChat() {
       const entry = { id:Date.now(), date:today, dateShort:new Date().toLocaleDateString("ko-KR"), mood:p.mood, moodEmoji:p.moodEmoji, content:p.content };
       const updated = [entry, ...diaries];
       setDiaries(updated);
-      window.storage.set("dal:diaries", JSON.stringify(updated)).catch(()=>{});
+      localStorage.setItem("dal:diaries", JSON.stringify(updated));
       setShowHistory(false); setShowDiaries(true);
     } catch {} finally { setDiaryLoad(false); }
   };
