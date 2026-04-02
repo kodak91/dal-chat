@@ -84,6 +84,7 @@ function HistoryPanel({ messages, streamingText, profileNotes, onClose, onMakeDi
         )}
         <div ref={endRef} />
       </div>
+    </div>
   );
 }
 
