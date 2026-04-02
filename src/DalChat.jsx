@@ -175,9 +175,7 @@ export default function DalChat() {
   // ── 타이핑 애니메이션 ─────────────────────────────────
   const startTypewriter = useCallback((fullText) => {
     if (typeTimerRef.current) clearTimeout(typeTimerRef.current);
-    const paragraphs = fullText.split(/
-
-+/).map(p => p.trim()).filter(Boolean);
+    const paragraphs = fullText.split(String.fromCharCode(10)+String.fromCharCode(10)).map(p => p.trim()).filter(Boolean);
     if (!paragraphs.length) return;
 
     let pIdx = 0;
