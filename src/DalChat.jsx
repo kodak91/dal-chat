@@ -141,9 +141,11 @@ export default function DalChat() {
   const [bubbleKey, setBubbleKey]      = useState(0);
   // 키보드 패럴랙스
   const [kbShift, setKbShift]          = useState(0);
+  const [isTyping, setIsTyping]        = useState(false);
   const vvHeightRef                    = useRef(null);
   const taRef                          = useRef(null);
   const profileRef                     = useRef({ notes:"" });
+  const typeTimerRef                   = useRef(null);
 
   // storage 로드
   useEffect(() => {
