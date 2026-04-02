@@ -46,7 +46,7 @@ function HistoryPanel({ messages, streamingText, profileNotes, onClose, onMakeDi
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, streamingText]);
   return (
-    <div style={{ position:"fixed",top:0,right:0,bottom:0,width:"min(340px,91vw)",background:"#04070f",borderLeft:"1px solid #141e30",zIndex:300,display:"flex",flexDirection:"column",fontFamily:"'Noto Sans KR',sans-serif",animation:"slideIn .22s ease forwards" }}>
+    <div style={{ position:"absolute",top:0,right:0,bottom:0,width:"min(340px,91vw)",background:"#04070f",borderLeft:"1px solid #141e30",zIndex:300,display:"flex",flexDirection:"column",fontFamily:"'Noto Sans KR',sans-serif",animation:"slideIn .22s ease forwards" }}>
       <div style={{ padding:"15px 18px",borderBottom:"1px solid #141e30",display:"flex",alignItems:"center",gap:10,flexShrink:0 }}>
         <button onClick={onClose} style={{ background:"none",border:"none",color:"#445",cursor:"pointer",fontSize:18,padding:0,lineHeight:1 }}>✕</button>
         <span style={{ color:"#6878a0",fontSize:13,fontWeight:600 }}>오늘의 대화</span>
@@ -85,6 +85,7 @@ function HistoryPanel({ messages, streamingText, profileNotes, onClose, onMakeDi
         <div ref={endRef} />
       </div>
     </div>
+    </div>
   );
 }
 
@@ -92,7 +93,7 @@ function HistoryPanel({ messages, streamingText, profileNotes, onClose, onMakeDi
 function DiaryModal({ diaries, onClose }) {
   const [view, setView] = useState(null);
   return (
-    <div style={{ position:"fixed",inset:0,background:"#030508",zIndex:400,display:"flex",flexDirection:"column",fontFamily:"'Noto Sans KR',sans-serif",animation:"fadeIn .2s ease forwards" }}>
+    <div style={{ position:"absolute",inset:0,background:"#030508",zIndex:400,display:"flex",flexDirection:"column",fontFamily:"'Noto Sans KR',sans-serif",animation:"fadeIn .2s ease forwards" }}>
       <div style={{ padding:"17px 22px",borderBottom:"1px solid #141e30",display:"flex",alignItems:"center",gap:12,flexShrink:0 }}>
         {view ? <button onClick={()=>setView(null)} style={{ background:"none",border:"none",color:"#384860",cursor:"pointer",fontSize:18,padding:0 }}>←</button>
                : <button onClick={onClose}           style={{ background:"none",border:"none",color:"#384860",cursor:"pointer",fontSize:18,padding:0 }}>✕</button>}
@@ -121,6 +122,7 @@ function DiaryModal({ diaries, onClose }) {
           </div>
         ))}
       </div>
+    </div>
     </div>
   );
 }
@@ -327,7 +329,8 @@ export default function DalChat() {
   const personShift = kbShift * 0.30;
 
   return (
-    <div style={{ height:"100vh",width:"100vw",overflow:"hidden",position:"relative",background:"#020810",fontFamily:"'Noto Sans KR',sans-serif" }}>
+    <div style={{ width:"100vw",height:"100dvh",background:"#000",display:"flex",justifyContent:"center",overflow:"hidden" }}>
+    <div style={{ width:"min(390px,100vw)",height:"100%",overflow:"hidden",position:"relative",background:"#020810",fontFamily:"'Noto Sans KR',sans-serif",flexShrink:0 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&display=swap');
         @keyframes moonFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
@@ -477,6 +480,7 @@ export default function DalChat() {
 
       {showHistory && <HistoryPanel messages={messages} streamingText={streamingText} profileNotes={profile?.notes} onClose={()=>setShowHistory(false)} onMakeDiary={makeDiary} diaryLoading={diaryLoading} onOpenDiaries={()=>{setShowDiaries(true);setShowHistory(false);}} />}
       {showDiaries && <DiaryModal diaries={diaries} onClose={()=>setShowDiaries(false)} />}
+    </div>
     </div>
   );
 }
