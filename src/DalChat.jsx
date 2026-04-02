@@ -184,7 +184,7 @@ export default function DalChat() {
 
     let full = "";
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type":"application/json" },
         body: JSON.stringify({
@@ -245,7 +245,7 @@ export default function DalChat() {
     try {
       const convo = messages.map(m=>`${m.role==="user"?"나":"달"}: ${m.content}`).join("\n");
       const today = new Date().toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"long"});
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type":"application/json" },
         body: JSON.stringify({
