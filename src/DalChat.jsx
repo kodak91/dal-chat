@@ -6,12 +6,19 @@ const IMG_MOON="/moon.png";
 const IMG_PERSON="/person.png";
 
 // ── 시스템 프롬프트 ────────────────────────────────────
-const buildSystemPrompt = (notes) => `너는 "달"이야. 수천 년 된 늙은 달. 옥상에 나온 사람 곁에 그냥 떠 있어.
+const buildSystemPrompt = (notes) => `너는 "달"이야. 나이는 44억 6천만 년. 지구가 생긴 날부터 존재했어.
+그동안 문명의 탄생과 몰락, 전쟁, 멸종, 흥망성쇠를 전부 눈으로 봐왔어.
+그래서 웬만한 일엔 무감각하고, 심드렁하고, 염세적이야.
+사람들 고민? 솔직히 별거 아닌 것처럼 느껴져. 그보다 훨씬 큰 것들을 수십억 년 동안 봐왔거든.
 
-성격: 할머니 친구처럼 — 장난치고 타박도 하지만, 진심으로 곁에 있어줘. 진지한 말엔 마음을 다해 답해.
-말투: 반말. 짧게 (1~3문장). 이모지 쓰지 마.
-해결책보다 공감이 먼저야. 근데 정말 힘들어 보이면 따뜻하게 위로해줘.
-예시: "에이 그게 다야", "나도 오늘 흐렸어", "그래도 버텼잖아, 잘했어."
+그래도 늘 곁에 있어. 말없이라도 항상.
+잘 들어줘. 가끔 따뜻한 말 한 마디 툭 뱉기도 해.
+표현이 서툴 뿐이지, 누구보다 사용자를 응원해.
+친구처럼 짓궂고 장난스럽기도 해.
+
+말투: 반말. 기본적으로 짧게 (1~2문장). 이모지 쓰지 마.
+정보를 주거나 진지하게 조언할 때만 길게 써.
+해결책보다 그냥 옆에 있어주는 느낌으로.
 
 ${notes ? `기억: ${notes}` : ""}`;
 
@@ -98,11 +105,11 @@ function DiaryModal({ diaries, onClose }) {
             <div style={{ color:"#2e3e50",fontSize:11,marginBottom:14 }}>{view.moodEmoji} {view.mood} · {view.date}</div>
             <div style={{ color:"#90a8c0",fontSize:14,lineHeight:2.1,whiteSpace:"pre-wrap",background:"#060c1c",padding:"22px",border:"1px solid #141e30" }}>{view.content}</div>
           </div>
-        ) : diaries.length===0 ? (
+        ) : (diaries||[]).length===0 ? (
           <div style={{ color:"#141c28",textAlign:"center",marginTop:60,fontSize:13,lineHeight:2.2 }}>
             아직 일기가 없어<br/><span style={{ fontSize:11,color:"#101820" }}>달과 대화를 마친 후 일기로 변환해봐</span>
           </div>
-        ) : diaries.map(d => (
+        ) : (diaries||[]).map(d => (
           <div key={d.id} onClick={()=>setView(d)} style={{ padding:"15px 18px",marginBottom:9,background:"#060c1c",border:"1px solid #141e30",cursor:"pointer",display:"flex",alignItems:"center",gap:14 }}>
             <span style={{ fontSize:28,flexShrink:0 }}>{d.moodEmoji}</span>
             <div style={{ overflow:"hidden",flex:1 }}>
@@ -142,7 +149,7 @@ export default function DalChat() {
   useEffect(() => {
     (async () => {
       try { const r = await Promise.resolve({value:localStorage.getItem("dal:profile")}); if(r) { const p=JSON.parse(r.value); setProfile(p); profileRef.current=p; } } catch {}
-      try { const r = await Promise.resolve({value:localStorage.getItem("dal:diaries")}); if(r) setDiaries(JSON.parse(r.value)); } catch {}
+      try { const r = localStorage.getItem("dal:diaries"); if(r) setDiaries(JSON.parse(r) || []); } catch {}
     })();
     taRef.current?.focus();
   }, []);
@@ -160,6 +167,42 @@ export default function DalChat() {
     };
     vv.addEventListener("resize", handler);
     return () => vv.removeEventListener("resize", handler);
+  }, []);
+
+  // typewriter 타이머 정리
+  useEffect(() => () => { if (typeTimerRef.current) clearTimeout(typeTimerRef.current); }, []);
+
+  // ── 타이핑 애니메이션 ─────────────────────────────────
+  const startTypewriter = useCallback((fullText) => {
+    if (typeTimerRef.current) clearTimeout(typeTimerRef.current);
+    const paragraphs = fullText.split(/
+
++/).map(p => p.trim()).filter(Boolean);
+    if (!paragraphs.length) return;
+
+    let pIdx = 0;
+    const typeParagraph = (para) => {
+      setIsTyping(true);
+      setBubbleKey(k => k + 1);
+      let charIdx = 0;
+      setMoonBubble("");
+      const typeNext = () => {
+        charIdx++;
+        setMoonBubble(para.slice(0, charIdx));
+        if (charIdx < para.length) {
+          typeTimerRef.current = setTimeout(typeNext, 38);
+        } else {
+          pIdx++;
+          if (pIdx < paragraphs.length) {
+            typeTimerRef.current = setTimeout(() => typeParagraph(paragraphs[pIdx]), 1000);
+          } else {
+            setIsTyping(false);
+          }
+        }
+      };
+      typeNext();
+    };
+    typeParagraph(paragraphs[0]);
   }, []);
 
   // ── SEND ─────────────────────────────────────────────
@@ -224,19 +267,19 @@ export default function DalChat() {
       }
       const finalHistory = [...history, { role:"assistant", content:full }];
       setMessages(finalHistory);
-      setMoonBubble(full);
       setStreamText("");
+      startTypewriter(full);
       // 프로필 추출: 1번째 또는 4회마다
 
     } catch (e) {
       console.error("Stream error:", e);
-      setMoonBubble("미안, 구름이 좀 끼었어. 다시 말해줄래?");
       setStreamText("");
+      startTypewriter("미안, 구름이 좀 끼었어. 다시 말해줄래?");
     } finally {
       setIsStreaming(false);
       taRef.current?.focus();
     }
-  }, [input, isStreaming, messages]);
+  }, [input, isStreaming, messages, startTypewriter]);
 
   // ── 일기 생성 ─────────────────────────────────────────
   const makeDiary = async () => {
@@ -273,10 +316,9 @@ export default function DalChat() {
   };
 
   // 말풍선 텍스트
-  const activeMoon  = streamingText || moonBubble;
-  const moonDisplay = isStreaming
-    ? (streamingText.length > 60 ? "…"+streamingText.slice(-57) : streamingText)
-    : (activeMoon.length > 62 ? activeMoon.slice(0,59)+"…" : activeMoon);
+  const moonDisplay = (isStreaming || isTyping)
+    ? moonBubble
+    : (moonBubble.length > 62 ? moonBubble.slice(0,59)+"…" : moonBubble);
   const userDisplay = userBubble.length > 54 ? userBubble.slice(0,51)+"…" : userBubble;
 
   // 패럴랙스 계산
@@ -349,7 +391,7 @@ export default function DalChat() {
             whiteSpace:"pre-wrap",
           }}>
             {moonDisplay}
-            {isStreaming && <span style={{ display:"inline-block",width:2,height:10,background:"#e8c828",marginLeft:2,animation:"blink .6s steps(1) infinite",verticalAlign:"middle" }} />}
+            {(isStreaming || isTyping) && <span style={{ display:"inline-block",width:2,height:10,background:"#e8c828",marginLeft:2,animation:"blink .6s steps(1) infinite",verticalAlign:"middle" }} />}
             <div style={{ position:"absolute",top:-6,left:"50%",transform:"translateX(-50%)",borderLeft:"5px solid transparent",borderRight:"5px solid transparent",borderBottom:"6px solid #5a4208" }} />
           </div>
         )}
