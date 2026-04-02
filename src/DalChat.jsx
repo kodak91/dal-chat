@@ -84,7 +84,6 @@ function HistoryPanel({ messages, streamingText, profileNotes, onClose, onMakeDi
         )}
         <div ref={endRef} />
       </div>
-    </div>
   );
 }
 
@@ -121,7 +120,6 @@ function DiaryModal({ diaries, onClose }) {
           </div>
         ))}
       </div>
-    </div>
     </div>
   );
 }
