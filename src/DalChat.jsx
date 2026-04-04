@@ -103,17 +103,17 @@ function MoonFace({ isThinking, size }) {
 
   }, [isThinking]);
 
-  // 입 모양 3종
+  // 눈: y=34, 눈 사이 5씩 좁게(x 37/58), 입: 눈 아래 5(y=44), 전체 중심 y=40(SVG 중앙 50 기준 10% 위)
   const mouth = [
 
     // 0: 닫힘
-    <rect key="m" x="45" y="62" width="11" height="2"   rx="1"   fill="#2a1a00" opacity="0.32" shapeRendering="crispEdges" />,
+    <rect key="m" x="45" y="44" width="11" height="2" rx="1"   fill="#2a1a00" opacity="0.32" shapeRendering="crispEdges" />,
 
     // 1: 살짝 열림
-    <rect key="m" x="45" y="60" width="11" height="4"   rx="2"   fill="#2a1a00" opacity="0.40" shapeRendering="crispEdges" />,
+    <rect key="m" x="45" y="43" width="11" height="4" rx="2"   fill="#2a1a00" opacity="0.40" shapeRendering="crispEdges" />,
 
     // 2: 더 열림
-    <rect key="m" x="44" y="59" width="13" height="6"   rx="3"   fill="#2a1a00" opacity="0.46" shapeRendering="crispEdges" />,
+    <rect key="m" x="44" y="43" width="13" height="6" rx="3"   fill="#2a1a00" opacity="0.46" shapeRendering="crispEdges" />,
 
   ];
 
@@ -123,15 +123,15 @@ function MoonFace({ isThinking, size }) {
 
       {/* 왼쪽 눈 */}
 
-      <rect x="32" y="44" width="5" height="5" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
+      <rect x="37" y="34" width="5" height="5" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
 
       {/* 오른쪽 눈 */}
 
       {isThinking
 
-        ? <rect x="63" y="46" width="9" height="3" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
+        ? <rect x="57" y="36" width="7" height="3" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
 
-        : <rect x="63" y="44" width="5" height="5" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
+        : <rect x="58" y="34" width="5" height="5" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
 
       }
 
@@ -287,7 +287,7 @@ function DiaryModal({ diaries, onClose }) {
 
   return (
 
-    <div style={{ position:"fixed",inset:0,background:"#030508",zIndex:400,maxWidth:"390px",left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",fontFamily:"'Noto Sans KR',sans-serif",animation:"fadeIn .2s ease forwards" }}>
+    <div style={{ position:"fixed",top:0,bottom:0,left:"50%",transform:"translateX(-50%)",width:"min(390px,100vw)",background:"#030508",zIndex:400,display:"flex",flexDirection:"column",fontFamily:"'Noto Sans KR',sans-serif",animation:"fadeIn .2s ease forwards" }}>
 
       <div style={{ padding:"17px 22px",borderBottom:"1px solid #141e30",display:"flex",alignItems:"center",gap:12,flexShrink:0 }}>
 
@@ -1081,7 +1081,7 @@ ${convoText}`;
 
         <img src={IMG_PERSON} alt="" style={{
 
-          width:"75%",
+          width:"105%",
 
           maxHeight:"66vh",
 
@@ -1092,8 +1092,6 @@ ${convoText}`;
           display:"block",
 
           userSelect:"none",
-
-          marginLeft:"3%",
 
           marginBottom:"-3vh",
 
