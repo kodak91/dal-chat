@@ -2,8 +2,8 @@
   "name": "dal-chat",
   "version": "1.0.0",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "npx vite",
+    "build": "npx vite build",
     "preview": "vite preview"
   },
   "engines": {
