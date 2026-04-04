@@ -737,11 +737,10 @@ ${convoText}`;
 
       const finalHistory = [...history, { role:"assistant", content:full }];
 
+      // React 18 자동 배칭: 세 setState가 단일 렌더로 묶여 동시 반영
       setMessages(finalHistory);
-
       setStreamText("");
-
-      setTimeout(() => startTypewriter(full), 200);
+      startTypewriter(full);
 
       // 메모리 추출: 1번째 또는 4회마다 (백그라운드)
       const userCount = finalHistory.filter(m => m.role === "user").length;
