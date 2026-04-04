@@ -87,27 +87,57 @@ function MoonFace({ isThinking, size }) {
 
   const s = size || 120;
 
+  const [mouthState, setMouthState] = useState(0);
+
+  useEffect(() => {
+
+    if (!isThinking) { setMouthState(0); return; }
+
+    const cycle = [0, 1, 2, 1];
+
+    let i = 0;
+
+    const id = setInterval(() => { i = (i + 1) % cycle.length; setMouthState(cycle[i]); }, 190);
+
+    return () => clearInterval(id);
+
+  }, [isThinking]);
+
+  // 입 모양 3종
+  const mouth = [
+
+    // 0: 닫힘
+    <rect key="m" x="45" y="62" width="11" height="2"   rx="1"   fill="#2a1a00" opacity="0.32" shapeRendering="crispEdges" />,
+
+    // 1: 살짝 열림
+    <rect key="m" x="45" y="60" width="11" height="4"   rx="2"   fill="#2a1a00" opacity="0.40" shapeRendering="crispEdges" />,
+
+    // 2: 더 열림
+    <rect key="m" x="44" y="59" width="13" height="6"   rx="3"   fill="#2a1a00" opacity="0.46" shapeRendering="crispEdges" />,
+
+  ];
+
   return (
 
     <svg width={s} height={s} viewBox="0 0 100 100" style={{ display:"block", pointerEvents:"none" }}>
 
       {/* 왼쪽 눈 */}
 
-      <rect x="31" y="42" width="8" height="8" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
+      <rect x="32" y="44" width="5" height="5" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
 
       {/* 오른쪽 눈 */}
 
       {isThinking
 
-        ? <rect x="61" y="46" width="12" height="4" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
+        ? <rect x="63" y="46" width="9" height="3" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
 
-        : <rect x="61" y="42" width="8"  height="8" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
+        : <rect x="63" y="44" width="5" height="5" rx="1" fill="#2a1a00" opacity="0.55" shapeRendering="crispEdges" />
 
       }
 
       {/* 입 */}
 
-      <rect x="44" y="60" width="14" height="3" rx="1.5" fill="#2a1a00" opacity="0.35" shapeRendering="crispEdges" />
+      {mouth[mouthState]}
 
     </svg>
 
@@ -122,6 +152,8 @@ function MoonFace({ isThinking, size }) {
 function HistoryPanel({ messages, streamingText, longMem, shortMem, onClose, onMakeDiary, diaryLoading, onOpenDiaries }) {
 
   const endRef = useRef(null);
+
+  const [memOpen, setMemOpen] = useState(false);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, streamingText]);
 
@@ -141,6 +173,8 @@ function HistoryPanel({ messages, streamingText, longMem, shortMem, onClose, onM
     return `${when}: ${e.content}`;
   });
 
+  const hasMemory = longLines.length > 0 || recentLines.length > 0;
+
   return (
 
     <div style={{ position:"fixed",top:0,right:0,bottom:0,width:"min(340px,min(390px,100vw))",background:"#04070f",borderLeft:"1px solid #141e30",zIndex:300,display:"flex",flexDirection:"column",fontFamily:"'Noto Sans KR',sans-serif",animation:"slideIn .22s ease forwards" }}>
@@ -153,7 +187,7 @@ function HistoryPanel({ messages, streamingText, longMem, shortMem, onClose, onM
 
         <div style={{ marginLeft:"auto",display:"flex",gap:6 }}>
 
-          <button onClick={onOpenDiaries} style={{ background:"#080f1e",border:"1px solid #141e30",color:"#384860",fontSize:10,padding:"5px 9px",cursor:"pointer",fontFamily:"inherit" }}>📔 일기장</button>
+          <button onClick={onOpenDiaries} style={{ background:"#080f1e",border:"1px solid #5a4208",color:"#7a5a10",fontSize:10,padding:"5px 9px",cursor:"pointer",fontFamily:"inherit" }}>📔 일기장</button>
 
           <button onClick={onMakeDiary} disabled={diaryLoading||!messages.length} style={{ background:"#080f08",border:`1px solid ${messages.length?"#182e18":"#141e30"}`,color:diaryLoading||!messages.length?"#243224":"#4ea84e",fontSize:10,padding:"5px 9px",cursor:diaryLoading||!messages.length?"not-allowed":"pointer",fontFamily:"inherit" }}>
 
@@ -165,21 +199,29 @@ function HistoryPanel({ messages, streamingText, longMem, shortMem, onClose, onM
 
       </div>
 
-      {(longLines.length > 0 || recentLines.length > 0) && (
+      {hasMemory && (
 
-        <div style={{ padding:"8px 18px",borderBottom:"1px solid #141e30",background:"#060a18",flexShrink:0 }}>
+        <div style={{ borderBottom:"1px solid #141e30",background:"#060a18",flexShrink:0 }}>
 
-          {longLines.length > 0 && (
-            <>
-              <div style={{ color:"#1e2c3c",fontSize:10,marginBottom:2 }}>달이 기억하는 것</div>
-              <div style={{ color:"#304458",fontSize:11,lineHeight:1.55 }}>{longLines.join('\n')}</div>
-            </>
-          )}
+          <button
+            onClick={() => setMemOpen(o => !o)}
+            style={{ width:"100%",padding:"7px 18px",background:"none",border:"none",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:"inherit" }}
+          >
+            <span style={{ color:"#1e2c3c",fontSize:10 }}>달이 기억하는 것</span>
+            <span style={{ color:"#1e2c3c",fontSize:10,transition:"transform .2s",display:"inline-block",transform:memOpen?"rotate(90deg)":"rotate(0deg)" }}>›</span>
+          </button>
 
-          {recentLines.length > 0 && (
-            <div style={{ marginTop: longLines.length > 0 ? 6 : 0 }}>
-              <div style={{ color:"#1e2c3c",fontSize:10,marginBottom:2 }}>최근 기억 (시간이 지나면 사라져)</div>
-              <div style={{ color:"#253040",fontSize:11,lineHeight:1.55 }}>{recentLines.join('\n')}</div>
+          {memOpen && (
+            <div style={{ padding:"0 18px 10px" }}>
+              {longLines.length > 0 && (
+                <div style={{ color:"#304458",fontSize:11,lineHeight:1.6,whiteSpace:"pre-wrap" }}>{longLines.join('\n')}</div>
+              )}
+              {recentLines.length > 0 && (
+                <div style={{ marginTop: longLines.length > 0 ? 6 : 0 }}>
+                  <div style={{ color:"#1a2530",fontSize:10,marginBottom:2 }}>최근 (시간이 지나면 사라져)</div>
+                  <div style={{ color:"#253040",fontSize:11,lineHeight:1.6,whiteSpace:"pre-wrap" }}>{recentLines.join('\n')}</div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1039,9 +1081,9 @@ ${convoText}`;
 
         <img src={IMG_PERSON} alt="" style={{
 
-          width:"100%",
+          width:"75%",
 
-          maxHeight:"62vh",
+          maxHeight:"66vh",
 
           objectFit:"contain",
 
@@ -1051,7 +1093,9 @@ ${convoText}`;
 
           userSelect:"none",
 
-          marginBottom:"-8vh",
+          marginLeft:"3%",
+
+          marginBottom:"-3vh",
 
         }} />
 
@@ -1063,9 +1107,9 @@ ${convoText}`;
 
       <div style={{ position:"absolute",top:14,right:14,zIndex:100,display:"flex",gap:7 }}>
 
-        <button onClick={()=>{setShowDiaries(true);setShowHistory(false);}} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #14203a",color:"#2c3e58",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>📔</button>
+        <button onClick={()=>{setShowDiaries(true);setShowHistory(false);}} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #5a4208",color:"#7a5a10",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>📔</button>
 
-        <button onClick={()=>{setShowHistory(true);setShowDiaries(false);}} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #14203a",color:"#2c3e58",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>기록</button>
+        <button onClick={()=>{setShowHistory(true);setShowDiaries(false);}} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #5a4208",color:"#7a5a10",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>기록</button>
 
       </div>
 
@@ -1103,9 +1147,9 @@ ${convoText}`;
 
             background:isStreaming||!input.trim()?"rgba(8,13,26,.8)":"rgba(14,28,56,.9)",
 
-            border:`1px solid ${isStreaming||!input.trim()?"#0e1828":"#1e3464"}`,
+            border:`1px solid ${isStreaming||!input.trim()?"#2a1a00":"#5a4208"}`,
 
-            color:isStreaming||!input.trim()?"#182440":"#4878b8",
+            color:isStreaming||!input.trim()?"#2a1a00":"#c8a020",
 
             cursor:isStreaming||!input.trim()?"not-allowed":"pointer",
 
