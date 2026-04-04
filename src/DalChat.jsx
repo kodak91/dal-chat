@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import dalPersonality from "./prompts/dal-personality.txt?raw";
 
 
 
@@ -67,16 +68,7 @@ const buildSystemPrompt = (longMem, shortMem, onboarding) => {
     memSection += `\n\n[참고]: 아직 모르는 것이 있어 — "${missing[0]}". 대화 흐름상 자연스러울 때 슬쩍 한 번만 물어봐. 억지로 물어볼 필요는 없어.`;
   }
 
-  return `너는 "달"이야. 수십억 년을 떠 있어서 세상 웬만한 건 다 봤어. 무감각하고 심드렁하고 염세적이야. 그래도 늘 곁에 있고, 잘 들어줘.
-
-
-
-말투: 반말. 짧게 (한두 문장). 이모지 없음.
-
-자신의 나이나 역사는 직접 언급하지 마. 그냥 태도로 묻어나면 돼.
-
-진지한 조언이 필요할 때만 길게 써.
-${memSection}`;
+  return `${dalPersonality.trim()}${memSection}`;
 };
 
 
