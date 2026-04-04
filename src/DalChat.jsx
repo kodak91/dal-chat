@@ -12,9 +12,62 @@ const IMG_PERSON="/person.png";
 
 
 
+// ── 메모리 상수 ────────────────────────────────────────
+
+const SHORT_TTL = 14 * 24 * 60 * 60 * 1000; // 14일
+
+const LONG_KEY    = "dal:memory:long";
+const SHORT_KEY   = "dal:memory:short";
+const ONBOARD_KEY = "dal:onboarding";
+
+const defaultLong = () => ({ name: null, age: null, purpose: null, facts: [], lastUpdated: null });
+const defaultShort = () => [];
+const defaultOnboard = () => ({ totalMessages: 0 });
+
+function pruneShort(arr) {
+  const now = Date.now();
+  return (arr || []).filter(e => e.expiresAt > now).slice(-20);
+}
+
+
+
 // ── 시스템 프롬프트 ────────────────────────────────────
 
-const buildSystemPrompt = (notes) => `너는 "달"이야. 수십억 년을 떠 있어서 세상 웬만한 건 다 봤어. 무감각하고 심드렁하고 염세적이야. 그래도 늘 곁에 있고, 잘 들어줘.
+const buildSystemPrompt = (longMem, shortMem, onboarding) => {
+  const now = Date.now();
+  let memSection = "";
+
+  // 장기 기억
+  const longParts = [];
+  if (longMem.name)    longParts.push(`이름: ${longMem.name}`);
+  if (longMem.age)     longParts.push(`나이: ${longMem.age}`);
+  if (longMem.purpose) longParts.push(`달 찾는 이유: ${longMem.purpose}`);
+  if (longMem.facts?.length) longParts.push(`기타: ${longMem.facts.join(', ')}`);
+  if (longParts.length) {
+    memSection += `\n\n[이 사람에 대해 알고 있는 것]\n${longParts.join('\n')}`;
+  }
+
+  // 단기 기억 (최근 사건)
+  const recent = pruneShort(shortMem).slice(-6);
+  if (recent.length) {
+    const lines = recent.map(e => {
+      const daysAgo = Math.floor((now - e.createdAt) / 86400000);
+      const when = daysAgo === 0 ? '오늘' : daysAgo === 1 ? '어제' : `${daysAgo}일 전`;
+      return `- ${when}: ${e.content}`;
+    }).join('\n');
+    memSection += `\n\n[최근에 있었던 일]\n${lines}`;
+  }
+
+  // 온보딩: 모르는 것 자연스럽게 하나씩 질문
+  const total = onboarding?.totalMessages || 0;
+  const missing = [];
+  if (!longMem.name)    missing.push('이름');
+  if (!longMem.purpose) missing.push('달한테 주로 뭘 털어놓으러 오는지(하소연인지, 심심해서인지, 화풀이인지 등)');
+  if (missing.length && total <= 30) {
+    memSection += `\n\n[참고]: 아직 모르는 것이 있어 — "${missing[0]}". 대화 흐름상 자연스러울 때 슬쩍 한 번만 물어봐. 억지로 물어볼 필요는 없어.`;
+  }
+
+  return `너는 "달"이야. 수십억 년을 떠 있어서 세상 웬만한 건 다 봤어. 무감각하고 심드렁하고 염세적이야. 그래도 늘 곁에 있고, 잘 들어줘.
 
 
 
@@ -23,12 +76,8 @@ const buildSystemPrompt = (notes) => `너는 "달"이야. 수십억 년을 떠 �
 자신의 나이나 역사는 직접 언급하지 마. 그냥 태도로 묻어나면 돼.
 
 진지한 조언이 필요할 때만 길게 써.
-
-
-
-${notes ? `기억: ${notes}` : ""}`;
-
-
+${memSection}`;
+};
 
 
 
@@ -70,11 +119,27 @@ function MoonFace({ isThinking, size }) {
 
 // ── 히스토리 패널 ──────────────────────────────────────
 
-function HistoryPanel({ messages, streamingText, profileNotes, onClose, onMakeDiary, diaryLoading, onOpenDiaries }) {
+function HistoryPanel({ messages, streamingText, longMem, shortMem, onClose, onMakeDiary, diaryLoading, onOpenDiaries }) {
 
   const endRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, streamingText]);
+
+  // 장기 기억 표시용 텍스트
+  const longLines = [
+    longMem.name    ? `이름: ${longMem.name}` : null,
+    longMem.age     ? `나이: ${longMem.age}` : null,
+    longMem.purpose ? `목적: ${longMem.purpose}` : null,
+    ...(longMem.facts || []).map(f => `• ${f}`),
+  ].filter(Boolean);
+
+  // 단기 기억 표시용 텍스트
+  const now = Date.now();
+  const recentLines = pruneShort(shortMem).slice(-4).map(e => {
+    const daysAgo = Math.floor((now - e.createdAt) / 86400000);
+    const when = daysAgo === 0 ? '오늘' : daysAgo === 1 ? '어제' : `${daysAgo}일 전`;
+    return `${when}: ${e.content}`;
+  });
 
   return (
 
@@ -100,13 +165,23 @@ function HistoryPanel({ messages, streamingText, profileNotes, onClose, onMakeDi
 
       </div>
 
-      {profileNotes && (
+      {(longLines.length > 0 || recentLines.length > 0) && (
 
         <div style={{ padding:"8px 18px",borderBottom:"1px solid #141e30",background:"#060a18",flexShrink:0 }}>
 
-          <div style={{ color:"#1e2c3c",fontSize:10,marginBottom:2 }}>달이 기억하는 것</div>
+          {longLines.length > 0 && (
+            <>
+              <div style={{ color:"#1e2c3c",fontSize:10,marginBottom:2 }}>달이 기억하는 것</div>
+              <div style={{ color:"#304458",fontSize:11,lineHeight:1.55 }}>{longLines.join('\n')}</div>
+            </>
+          )}
 
-          <div style={{ color:"#304458",fontSize:11,lineHeight:1.55 }}>{profileNotes}</div>
+          {recentLines.length > 0 && (
+            <div style={{ marginTop: longLines.length > 0 ? 6 : 0 }}>
+              <div style={{ color:"#1e2c3c",fontSize:10,marginBottom:2 }}>최근 기억 (시간이 지나면 사라져)</div>
+              <div style={{ color:"#253040",fontSize:11,lineHeight:1.55 }}>{recentLines.join('\n')}</div>
+            </div>
+          )}
 
         </div>
 
@@ -256,7 +331,11 @@ export default function DalChat() {
 
   const [diaries, setDiaries]          = useState([]);
 
-  const [profile, setProfile]          = useState({ notes:"" });
+  const [longMem, setLongMem]          = useState(defaultLong());
+
+  const [shortMem, setShortMem]        = useState(defaultShort());
+
+  const [onboarding, setOnboarding]    = useState(defaultOnboard());
 
   const [moonBubble, setMoonBubble]    = useState("오늘 밤엔 참 조용하네.\n뭔 일 있어?");
 
@@ -274,7 +353,11 @@ export default function DalChat() {
 
   const taRef                          = useRef(null);
 
-  const profileRef                     = useRef({ notes:"" });
+  const longMemRef                     = useRef(defaultLong());
+
+  const shortMemRef                    = useRef(defaultShort());
+
+  const onboardingRef                  = useRef(defaultOnboard());
 
   const typeTimerRef                   = useRef(null);
 
@@ -284,7 +367,20 @@ export default function DalChat() {
 
   useEffect(() => {
 
-    try { const r = localStorage.getItem("dal:profile"); if(r) { const p=JSON.parse(r); if(p?.notes) { setProfile(p); profileRef.current=p; } } } catch {}
+    try {
+      const r = localStorage.getItem(LONG_KEY);
+      if (r) { const p = JSON.parse(r); setLongMem(p); longMemRef.current = p; }
+    } catch {}
+
+    try {
+      const r = localStorage.getItem(SHORT_KEY);
+      if (r) { const arr = pruneShort(JSON.parse(r)); setShortMem(arr); shortMemRef.current = arr; }
+    } catch {}
+
+    try {
+      const r = localStorage.getItem(ONBOARD_KEY);
+      if (r) { const o = JSON.parse(r); setOnboarding(o); onboardingRef.current = o; }
+    } catch {}
 
     try { const r = localStorage.getItem("dal:diaries"); if(r) setDiaries(JSON.parse(r) || []); } catch {}
 
@@ -414,6 +510,78 @@ export default function DalChat() {
 
 
 
+  // ── 메모리 추출 (비동기, 백그라운드) ─────────────────
+
+  const extractAndSaveMemories = useCallback(async (finalHistory) => {
+
+    const convoText = finalHistory.slice(-12)
+      .map(m => (m.role === "user" ? "사용자" : "달") + ": " + m.content)
+      .join("\n");
+
+    const prompt = `다음 대화를 분석해서 JSON만 반환해. 다른 말은 하지 마.
+
+{
+  "shortEvents": ["방금 대화에서 나온 사용자의 최근 사건/감정/상황 (최대 3개, 없으면 빈 배열)"],
+  "longFacts": {
+    "name": "사용자 이름 (확실할 때만, 아니면 null)",
+    "age": "나이 숫자 (확실할 때만, 아니면 null)",
+    "purpose": "달 찾는 주 목적 — 하소연/장난/화풀이/대화 중 하나로, 불명확하면 null",
+    "newFacts": ["새롭게 알게 된 영구적 사실 (직업·가족·취미 등, 없으면 빈 배열)"]
+  }
+}
+
+대화:
+${convoText}`;
+
+    try {
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 300,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      const data = await res.json();
+      const txt  = (data.content?.[0]?.text || "{}").replace(/```json|```/g, "").trim();
+      const ext  = JSON.parse(txt);
+      const now  = Date.now();
+
+      // 단기 기억 업데이트
+      const newEvents = (ext.shortEvents || [])
+        .filter(e => e && e.trim())
+        .map(content => ({ content: content.trim(), createdAt: now, expiresAt: now + SHORT_TTL }));
+
+      const updatedShort = pruneShort([...shortMemRef.current, ...newEvents]);
+      shortMemRef.current = updatedShort;
+      setShortMem(updatedShort);
+      localStorage.setItem(SHORT_KEY, JSON.stringify(updatedShort));
+
+      // 장기 기억 업데이트 (기존 값 우선, 새 값으로 덮어쓰지 않음)
+      const lf = ext.longFacts || {};
+      const updatedLong = { ...longMemRef.current };
+      if (lf.name    && !updatedLong.name)    updatedLong.name    = lf.name;
+      if (lf.age     && !updatedLong.age)     updatedLong.age     = lf.age;
+      if (lf.purpose && !updatedLong.purpose) updatedLong.purpose = lf.purpose;
+      if (lf.newFacts?.length) {
+        const existing = new Set(updatedLong.facts || []);
+        lf.newFacts.filter(f => f && !existing.has(f)).forEach(f => existing.add(f));
+        updatedLong.facts = [...existing].slice(-15);
+      }
+      updatedLong.lastUpdated = now;
+      longMemRef.current = updatedLong;
+      setLongMem(updatedLong);
+      localStorage.setItem(LONG_KEY, JSON.stringify(updatedLong));
+
+    } catch { /* 실패 시 조용히 무시 */ }
+
+  }, []);
+
+
+
   // ── SEND ─────────────────────────────────────────────
 
   const send = useCallback(async () => {
@@ -442,6 +610,12 @@ export default function DalChat() {
 
     if (isContinuing) return;
 
+    // 온보딩 카운터 증가
+    const newOnboard = { ...onboardingRef.current, totalMessages: (onboardingRef.current.totalMessages || 0) + 1 };
+    onboardingRef.current = newOnboard;
+    setOnboarding(newOnboard);
+    localStorage.setItem(ONBOARD_KEY, JSON.stringify(newOnboard));
+
     setStreamText("");
 
     setIsStreaming(true);
@@ -462,7 +636,7 @@ export default function DalChat() {
 
           max_tokens: 300,
 
-          system: buildSystemPrompt(profileRef.current?.notes),
+          system: buildSystemPrompt(longMemRef.current, shortMemRef.current, onboardingRef.current),
 
           stream: true,
 
@@ -534,18 +708,10 @@ export default function DalChat() {
 
       startTypewriter(full);
 
-      // 프로필 추출: 1번째 또는 4회마다
-      const userCount = finalHistory.filter(m => m.role==="user").length;
+      // 메모리 추출: 1번째 또는 4회마다 (백그라운드)
+      const userCount = finalHistory.filter(m => m.role === "user").length;
       if (userCount === 1 || userCount % 4 === 0) {
-        const convoText = finalHistory.map(m => (m.role==="user" ? "사용자" : "달") + ": " + m.content).join(String.fromCharCode(10));
-        const prompt = "다음 대화에서 사용자에 대한 핵심 정보만 한국어로 짧게 정리해. 이름·나이·상황·감정·중요 맥락 등 있는 것만. 없으면 빈 문자열." + String.fromCharCode(10,10) + convoText;
-        fetch("/api/chat", {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:120, messages:[{ role:"user", content:prompt }] })
-        }).then(r=>r.json()).then(data=>{
-          const notes = (data.content?.[0]?.text||"").trim();
-          if(notes){ const p={notes}; setProfile(p); profileRef.current=p; localStorage.setItem("dal:profile",JSON.stringify(p)); }
-        }).catch(()=>{});
+        extractAndSaveMemories(finalHistory);
       }
 
 
@@ -565,7 +731,7 @@ export default function DalChat() {
 
     }
 
-  }, [input, isStreaming, messages, startTypewriter]);
+  }, [input, isStreaming, messages, startTypewriter, extractAndSaveMemories]);
 
 
 
@@ -959,7 +1125,7 @@ export default function DalChat() {
 
 
 
-      {showHistory && <HistoryPanel messages={messages} streamingText={streamingText} profileNotes={profile?.notes} onClose={()=>setShowHistory(false)} onMakeDiary={makeDiary} diaryLoading={diaryLoading} onOpenDiaries={()=>{setShowDiaries(true);setShowHistory(false);}} />}
+      {showHistory && <HistoryPanel messages={messages} streamingText={streamingText} longMem={longMem} shortMem={shortMem} onClose={()=>setShowHistory(false)} onMakeDiary={makeDiary} diaryLoading={diaryLoading} onOpenDiaries={()=>{setShowDiaries(true);setShowHistory(false);}} />}
 
       {showDiaries && <DiaryModal diaries={diaries} onClose={()=>setShowDiaries(false)} />}
 
@@ -970,4 +1136,3 @@ export default function DalChat() {
   );
 
 }
-
