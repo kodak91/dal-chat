@@ -24,9 +24,24 @@ const DAY_END_H   = 17;
 const SLEEP_AT    = 50;
 const LOCK_AT     = 60;
 
-const LONG_KEY    = "dal:memory:long";
-const SHORT_KEY   = "dal:memory:short";
-const ONBOARD_KEY = "dal:onboarding";
+const LONG_KEY     = "dal:memory:long";
+const SHORT_KEY    = "dal:memory:short";
+const ONBOARD_KEY  = "dal:onboarding";
+const SESSION_MSGS = "dal:session:messages";  // 세션 메시지 (오후5시~오전5시)
+const SESSION_COMP = "dal:session:compress";  // 압축 인덱스
+const SESSION_DAILY= "dal:session:daily";     // 일일 압축 기억
+
+// 현재 유효한 세션의 시작 timestamp 반환. 낮(오전5시~오후5시)이면 null.
+function getSessionStart() {
+  const now = new Date();
+  const h = now.getHours();
+  if (h >= DAY_END_H) {
+    const s = new Date(now); s.setHours(DAY_END_H, 0, 0, 0); return s.getTime();
+  } else if (h < DAY_START_H) {
+    const s = new Date(now); s.setDate(s.getDate() - 1); s.setHours(DAY_END_H, 0, 0, 0); return s.getTime();
+  }
+  return null; // 낮 시간
+}
 
 const defaultLong = () => ({ name: null, age: null, purpose: null, facts: [], prefs: [], lastUpdated: null });
 const defaultShort = () => [];
@@ -457,7 +472,29 @@ export default function DalChat() {
 
     try { const r = localStorage.getItem("dal:diaries"); if(r) setDiaries(JSON.parse(r) || []); } catch {}
 
-    try { const r = sessionStorage.getItem("dal:memory:daily"); if(r){const d=JSON.parse(r);setDailyMem(d);dailyMemRef.current=d;} } catch {}
+    // 세션 데이터 복원 (오후5시~오전5시 범위 내면 유지)
+    const sessionStart = getSessionStart();
+    try {
+      const r = localStorage.getItem(SESSION_MSGS);
+      if (r) {
+        const { msgs, savedAt } = JSON.parse(r);
+        if (sessionStart && savedAt >= sessionStart && msgs?.length) {
+          setMessages(msgs); historyRef.current = msgs;
+          const lastDal  = [...msgs].reverse().find(m => m.role === "assistant");
+          const lastUser = [...msgs].reverse().find(m => m.role === "user");
+          if (lastDal)  setMoonBubble(lastDal.content.length > 62 ? lastDal.content.slice(0,59)+"…" : lastDal.content);
+          if (lastUser) setUserBubble(lastUser.content.length > 54 ? lastUser.content.slice(0,51)+"…" : lastUser.content);
+        } else { localStorage.removeItem(SESSION_MSGS); }
+      }
+    } catch {}
+    try {
+      const r = localStorage.getItem(SESSION_COMP);
+      if (r) { const { idx, savedAt } = JSON.parse(r); if (sessionStart && savedAt >= sessionStart) compressedUntilRef.current = idx; }
+    } catch {}
+    try {
+      const r = localStorage.getItem(SESSION_DAILY);
+      if (r) { const { data, savedAt } = JSON.parse(r); if (sessionStart && savedAt >= sessionStart) { setDailyMem(data); dailyMemRef.current = data; } }
+    } catch {}
 
     initTimeRef.current = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', hour12:false});
 
@@ -469,6 +506,22 @@ export default function DalChat() {
   }, []);
 
 
+
+  // 메시지 변경 시 세션 localStorage에 저장
+  useEffect(() => {
+    if (!messages.length) return;
+    const sessionStart = getSessionStart();
+    if (!sessionStart) return; // 낮 시간엔 저장 안 함
+    localStorage.setItem(SESSION_MSGS, JSON.stringify({ msgs: messages, savedAt: Date.now() }));
+  }, [messages]);
+
+  // dailyMem 변경 시 저장
+  useEffect(() => {
+    if (!dailyMem.length) return;
+    const sessionStart = getSessionStart();
+    if (!sessionStart) return;
+    localStorage.setItem(SESSION_DAILY, JSON.stringify({ data: dailyMem, savedAt: Date.now() }));
+  }, [dailyMem]);
 
   // 전체화면: 첫 제스처 시 즉시 요청
   useEffect(() => {
@@ -718,6 +771,7 @@ ${convoText}`;
       setDayResetMsg(null);
       setMessages([]);
       historyRef.current = [];
+      [SESSION_MSGS, SESSION_COMP, SESSION_DAILY].forEach(k => localStorage.removeItem(k));
       setMoonBubble("오늘 밤엔 참 조용하네.\n뭔 일 있어?");
       setUserBubble("");
       setIsLocked(false);
@@ -874,7 +928,11 @@ ${convoText}`;
       const compressEnd = finalHistory.length - 20;
       if (userCount % 10 === 0 && compressEnd > compressedUntilRef.current && compressEnd > 0) {
         const toCompress = finalHistory.slice(compressedUntilRef.current, compressEnd);
-        if (toCompress.length) { compressedUntilRef.current = compressEnd; compressDailyMem(toCompress); }
+        if (toCompress.length) {
+          compressedUntilRef.current = compressEnd;
+          localStorage.setItem(SESSION_COMP, JSON.stringify({ idx: compressEnd, savedAt: Date.now() }));
+          compressDailyMem(toCompress);
+        }
       }
 
 
