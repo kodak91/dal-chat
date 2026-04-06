@@ -431,6 +431,8 @@ export default function DalChat() {
 
   const compressedUntilRef             = useRef(0);
 
+  const historyRef                     = useRef([]); // API용 실시간 히스토리 (messages 지연과 분리)
+
 
 
 
@@ -468,28 +470,16 @@ export default function DalChat() {
 
 
 
-  // 전체화면 자동 요청 (첫 탭/클릭 시 — 둘 중 하나 발생하면 둘 다 제거)
-
+  // iOS 키보드 스크롤 방지 — body 고정
   useEffect(() => {
-
-    const req = () => {
-
-      document.removeEventListener("touchstart", req);
-
-      document.removeEventListener("click", req);
-
-      const el = document.documentElement;
-
-      if (!document.fullscreenElement) el.requestFullscreen?.().catch(()=>{});
-
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.width    = "100%";
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width    = "";
     };
-
-    document.addEventListener("touchstart", req, { passive:true });
-
-    document.addEventListener("click", req);
-
-    return () => { document.removeEventListener("touchstart", req); document.removeEventListener("click", req); };
-
   }, []);
 
 
@@ -514,7 +504,11 @@ export default function DalChat() {
 
       if (h > vvHeightRef.current) vvHeightRef.current = h; // 키보드 닫힐 때 베이스라인 갱신
 
-      setKbShift(Math.max(0, vvHeightRef.current - h));
+      const shift = Math.max(0, vvHeightRef.current - h);
+
+      setKbShift(shift);
+
+      if (shift > 0) window.scrollTo(0, 0); // 키보드 등장 시 상단 고정
 
     };
 
@@ -534,7 +528,7 @@ export default function DalChat() {
 
   // ── 타이핑 애니메이션 ─────────────────────────────────
 
-  const startTypewriter = useCallback((fullText) => {
+  const startTypewriter = useCallback((fullText, onComplete) => {
 
     if (typeTimerRef.current) clearTimeout(typeTimerRef.current);
 
@@ -577,6 +571,8 @@ export default function DalChat() {
           } else {
 
             setIsTyping(false);
+
+            onComplete?.();
 
           }
 
@@ -708,6 +704,7 @@ ${convoText}`;
       setIsDayMode(false);
       setDayResetMsg(null);
       setMessages([]);
+      historyRef.current = [];
       setMoonBubble("오늘 밤엔 참 조용하네.\n뭔 일 있어?");
       setUserBubble("");
       setIsLocked(false);
@@ -734,7 +731,9 @@ ${convoText}`;
 
     const newMsg  = { role:"user", content:displayText };
 
-    const history = [...messages, newMsg];
+    const history = [...historyRef.current, newMsg];
+
+    historyRef.current = history;
 
     setMessages(history);
 
@@ -846,10 +845,11 @@ ${convoText}`;
 
       const finalHistory = [...history, { role:"assistant", content:full }];
 
-      // React 18 자동 배칭: 세 setState가 단일 렌더로 묶여 동시 반영
-      setMessages(finalHistory);
+      historyRef.current = finalHistory; // 즉시 반영 (다음 send API 콜용)
+
       setStreamText("");
-      startTypewriter(full);
+
+      startTypewriter(full, () => setMessages(finalHistory)); // 애니메이션 끝나면 기록에 추가
 
       // 메모리 추출: 1번째 또는 4회마다 (백그라운드)
       const userCount = finalHistory.filter(m => m.role === "user").length;
@@ -881,7 +881,7 @@ ${convoText}`;
 
     }
 
-  }, [input, isStreaming, messages, startTypewriter, extractAndSaveMemories, compressDailyMem, isLocked, isDayMode]);
+  }, [input, isStreaming, startTypewriter, extractAndSaveMemories, compressDailyMem, isLocked, isDayMode]);
 
 
 
