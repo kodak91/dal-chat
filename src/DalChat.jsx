@@ -447,7 +447,10 @@ export default function DalChat() {
 
 
 
-  // 키보드 패럴랙스: visualViewport 감지
+  // 키보드 감지: 모바일만 적용, 데스크탑은 항상 0
+  // window.innerHeight = 레이아웃 뷰포트 (키보드 나타나도 안 변함)
+  // vv.height = 시각적 뷰포트 (키보드만큼 줄어듦)
+  // vv.offsetTop = 시각적 뷰포트가 스크롤된 양 (iOS에서 발생)
 
   useEffect(() => {
 
@@ -455,23 +458,23 @@ export default function DalChat() {
 
     if (!vv) return;
 
-    vvHeightRef.current = vv.height;
+    const isTouchDevice = navigator.maxTouchPoints > 0;
 
     const handler = () => {
 
-      const initial = vvHeightRef.current;
+      if (!isTouchDevice) { setKbShift(0); return; }
 
-      const current = vv.height;
+      const shift = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
 
-      const shrink  = Math.max(0, initial - current);
-
-      setKbShift(shrink);
+      setKbShift(shift);
 
     };
 
     vv.addEventListener("resize", handler);
 
-    return () => vv.removeEventListener("resize", handler);
+    vv.addEventListener("scroll", handler);
+
+    return () => { vv.removeEventListener("resize", handler); vv.removeEventListener("scroll", handler); };
 
   }, []);
 
