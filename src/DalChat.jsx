@@ -470,7 +470,19 @@ export default function DalChat() {
 
 
 
-  // iOS 키보드 스크롤 방지 — body 고정
+  // 전체화면: 첫 제스처 시 즉시 요청
+  useEffect(() => {
+    const req = () => {
+      document.removeEventListener("touchstart", req);
+      document.removeEventListener("click", req);
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(()=>{});
+    };
+    document.addEventListener("touchstart", req, { passive: true });
+    document.addEventListener("click", req);
+    return () => { document.removeEventListener("touchstart", req); document.removeEventListener("click", req); };
+  }, []);
+
+  // body 고정 — iOS 키보드/스크롤 완전 차단
   useEffect(() => {
     document.body.style.overflow = "hidden";
     document.body.style.position = "fixed";
@@ -508,13 +520,15 @@ export default function DalChat() {
 
       setKbShift(shift);
 
-      if (shift > 0) window.scrollTo(0, 0); // 키보드 등장 시 상단 고정
+      window.scrollTo(0, 0); // 항상 상단 고정 (키보드/스크롤 이벤트 모두)
 
     };
 
     vv.addEventListener("resize", handler);
 
-    return () => vv.removeEventListener("resize", handler);
+    vv.addEventListener("scroll", handler);
+
+    return () => { vv.removeEventListener("resize", handler); vv.removeEventListener("scroll", handler); };
 
   }, []);
 
@@ -1249,7 +1263,7 @@ ${convoText}`;
 
         <div style={{ display:"flex",alignItems:"flex-end",gap:9,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"8px 12px",backdropFilter:"blur(4px)" }}>
 
-          <textarea ref={taRef} value={input} onChange={onInput} onKeyDown={onKey} disabled={isStreaming||isDayMode||isLocked}
+          <textarea ref={taRef} value={input} onChange={onInput} onKeyDown={onKey} onFocus={() => setTimeout(() => window.scrollTo(0,0), 50)} disabled={isStreaming||isDayMode||isLocked}
 
             placeholder="달에게 말 걸어봐..."
 
