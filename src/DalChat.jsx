@@ -514,11 +514,10 @@ export default function DalChat() {
 
       if (h > vvHeightRef.current) vvHeightRef.current = h; // 키보드 닫힐 때 베이스라인 갱신
 
-      // 안드로이드: window.innerHeight도 같이 줄어들어 브라우저가 자체 처리 → JS 개입 불필요
-      // iOS: window.innerHeight 그대로 → 직접 shift 필요
-      const browserHandled = (window.innerHeight - h) < 80;
+      // UA로 명확하게 OS 판별: Android는 브라우저가 뷰포트 자동 조정 → kbShift 불필요
+      const isAndroid = /Android/i.test(navigator.userAgent);
 
-      setKbShift(browserHandled ? 0 : Math.max(0, vvHeightRef.current - h));
+      setKbShift(isAndroid ? 0 : Math.max(0, vvHeightRef.current - h));
 
       window.scrollTo(0, 0);
 
@@ -987,7 +986,7 @@ ${convoText}`;
 
     <div style={{ width:"100vw",height:"100dvh",background:"#000",display:"flex",justifyContent:"center",overflow:"hidden" }}>
 
-    <div style={{ width:"min(390px,100vw)",height:"100%",overflow:"hidden",position:"relative",background:"#020810",fontFamily:"'Noto Sans KR',sans-serif",flexShrink:0,transform:`translateY(-${kbShift}px)`,transition:"transform .15s ease-out" }}>
+    <div style={{ width:"min(390px,100vw)",height:"100dvh",overflow:"hidden",position:"relative",background:"#020810",fontFamily:"'Noto Sans KR',sans-serif",flexShrink:0,transform:`translateY(-${kbShift}px)`,transition:"transform .15s ease-out" }}>
 
       <style>{`
 
