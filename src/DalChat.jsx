@@ -38,10 +38,7 @@ const buildSystemPrompt = (longMem, shortMem, onboarding) => {
   const now = Date.now();
   const hour = new Date().getHours();
   const timeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-  const isActive = hour >= 17 || hour < 5;
-  const timeContext = isActive
-    ? `[현재 시각: ${timeStr}] 달의 활동 시간. 평소대로 대화해.`
-    : `[현재 시각: ${timeStr}] 달의 비활동 시간(낮). 아직 활동할 때가 아니라 귀찮아하거나 짧게 대답해. 그래도 얘기하고 싶어하면 들어줘.`;
+  const timeContext = `[현재 시각: ${timeStr}]`;
   let memSection = `\n\n${timeContext}`;
 
   // 장기 기억
@@ -392,6 +389,8 @@ export default function DalChat() {
 
   const vvHeightRef                    = useRef(null);
 
+  const vvWidthRef                     = useRef(null);
+
   const taRef                          = useRef(null);
 
   const longMemRef                     = useRef(defaultLong());
@@ -453,7 +452,7 @@ export default function DalChat() {
 
 
 
-  // 키보드 패럴랙스: visualViewport 감지
+  // 키보드 패럴랙스: visualViewport 감지 (너비 변화 = 창 크기 조정, 무시)
 
   useEffect(() => {
 
@@ -463,13 +462,24 @@ export default function DalChat() {
 
     vvHeightRef.current = vv.height;
 
+    vvWidthRef.current  = vv.width;
+
     const handler = () => {
 
-      const initial = vvHeightRef.current;
+      // 너비가 바뀌면 창 리사이즈 → 기준 리셋, shift 0
+      if (Math.abs(vv.width - vvWidthRef.current) > 10) {
 
-      const current = vv.height;
+        vvHeightRef.current = vv.height;
 
-      const shrink  = Math.max(0, initial - current);
+        vvWidthRef.current  = vv.width;
+
+        setKbShift(0);
+
+        return;
+
+      }
+
+      const shrink = Math.max(0, vvHeightRef.current - vv.height);
 
       setKbShift(shrink);
 
@@ -1079,7 +1089,7 @@ ${convoText}`;
 
         <img src={IMG_PERSON} alt="" style={{
 
-          width:"90%",
+          width:"86%",
 
           height:"auto",
 
