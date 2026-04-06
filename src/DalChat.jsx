@@ -482,15 +482,15 @@ export default function DalChat() {
     return () => { document.removeEventListener("touchstart", req); document.removeEventListener("click", req); };
   }, []);
 
-  // body 고정 — iOS 키보드/스크롤 완전 차단
+  // html/body 스크롤 차단 (position:fixed 없이 — 레이아웃 깨짐 방지)
   useEffect(() => {
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.width    = "100%";
+    const s = document.documentElement.style;
+    const b = document.body.style;
+    s.overflow = "hidden"; s.height = "100%";
+    b.overflow = "hidden"; b.height = "100%";
     return () => {
-      document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.width    = "";
+      s.overflow = ""; s.height = "";
+      b.overflow = ""; b.height = "";
     };
   }, []);
 
