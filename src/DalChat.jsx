@@ -1073,17 +1073,15 @@ ${convoText}`;
 
         <img src={IMG_PERSON} alt="" style={{
 
-          width:"75%",
+          width:"86.25%",
 
           height:"auto",
 
           maxHeight:"70vh",
 
-          objectFit:"contain",
-
-          objectPosition:"left bottom",
-
           display:"block",
+
+          marginLeft:0,
 
           userSelect:"none",
 
@@ -1111,13 +1109,15 @@ ${convoText}`;
 
       <div style={{
 
-        position:"absolute", bottom:0, left:0, right:0,
+        position:"absolute", bottom:kbShift, left:0, right:0,
 
         padding:"10px 14px 18px",
 
         background:"linear-gradient(0deg,rgba(2,5,12,.98) 70%,transparent)",
 
         zIndex:50,
+
+        transition:"bottom .2s ease-out",
 
       }}
 
