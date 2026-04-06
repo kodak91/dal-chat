@@ -482,15 +482,13 @@ export default function DalChat() {
     return () => { document.removeEventListener("touchstart", req); document.removeEventListener("click", req); };
   }, []);
 
-  // html/body 스크롤 차단 (position:fixed 없이 — 레이아웃 깨짐 방지)
+  // 스크롤 차단 (height는 건드리지 않음 — 안드로이드 뷰포트 리사이즈 방해 금지)
   useEffect(() => {
-    const s = document.documentElement.style;
-    const b = document.body.style;
-    s.overflow = "hidden"; s.height = "100%";
-    b.overflow = "hidden"; b.height = "100%";
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
     return () => {
-      s.overflow = ""; s.height = "";
-      b.overflow = ""; b.height = "";
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
     };
   }, []);
 
@@ -516,11 +514,13 @@ export default function DalChat() {
 
       if (h > vvHeightRef.current) vvHeightRef.current = h; // 키보드 닫힐 때 베이스라인 갱신
 
-      const shift = Math.max(0, vvHeightRef.current - h);
+      // 안드로이드: window.innerHeight도 같이 줄어들어 브라우저가 자체 처리 → JS 개입 불필요
+      // iOS: window.innerHeight 그대로 → 직접 shift 필요
+      const browserHandled = (window.innerHeight - h) < 80;
 
-      setKbShift(shift);
+      setKbShift(browserHandled ? 0 : Math.max(0, vvHeightRef.current - h));
 
-      window.scrollTo(0, 0); // 항상 상단 고정 (키보드/스크롤 이벤트 모두)
+      window.scrollTo(0, 0);
 
     };
 
