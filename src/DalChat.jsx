@@ -425,11 +425,15 @@ export default function DalChat() {
 
 
 
-  // 전체화면 자동 요청 (첫 탭/클릭 시)
+  // 전체화면 자동 요청 (첫 탭/클릭 시 — 둘 중 하나 발생하면 둘 다 제거)
 
   useEffect(() => {
 
     const req = () => {
+
+      document.removeEventListener("touchstart", req);
+
+      document.removeEventListener("click", req);
 
       const el = document.documentElement;
 
@@ -437,9 +441,9 @@ export default function DalChat() {
 
     };
 
-    document.addEventListener("touchstart", req, { once:true, passive:true });
+    document.addEventListener("touchstart", req, { passive:true });
 
-    document.addEventListener("click",      req, { once:true });
+    document.addEventListener("click", req);
 
     return () => { document.removeEventListener("touchstart", req); document.removeEventListener("click", req); };
 
@@ -447,10 +451,7 @@ export default function DalChat() {
 
 
 
-  // 키보드 감지: 모바일만 적용, 데스크탑은 항상 0
-  // window.innerHeight = 레이아웃 뷰포트 (키보드 나타나도 안 변함)
-  // vv.height = 시각적 뷰포트 (키보드만큼 줄어듦)
-  // vv.offsetTop = 시각적 뷰포트가 스크롤된 양 (iOS에서 발생)
+  // 키보드 감지: 터치 기기만, 베이스라인 비교 방식 (offsetTop 이벤트 타이밍 문제 회피)
 
   useEffect(() => {
 
@@ -460,21 +461,23 @@ export default function DalChat() {
 
     const isTouchDevice = navigator.maxTouchPoints > 0;
 
+    if (!isTouchDevice) return; // 데스크탑은 항상 0
+
+    vvHeightRef.current = vv.height;
+
     const handler = () => {
 
-      if (!isTouchDevice) { setKbShift(0); return; }
+      const h = vv.height;
 
-      const shift = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      if (h > vvHeightRef.current) vvHeightRef.current = h; // 키보드 닫힐 때 베이스라인 갱신
 
-      setKbShift(shift);
+      setKbShift(Math.max(0, vvHeightRef.current - h));
 
     };
 
     vv.addEventListener("resize", handler);
 
-    vv.addEventListener("scroll", handler);
-
-    return () => { vv.removeEventListener("resize", handler); vv.removeEventListener("scroll", handler); };
+    return () => vv.removeEventListener("resize", handler);
 
   }, []);
 
@@ -852,13 +855,7 @@ ${convoText}`;
 
 
 
-  // 패럴랙스 계산
-
-  const bgShift     = kbShift * 0.45;
-
-  const moonShift   = kbShift * 0.12;
-
-  const personShift = kbShift * 0.30;
+  // 키보드 올라올 때 전체 씬을 한 덩어리로 올리기 위해 컨테이너 transform 사용
 
 
 
@@ -866,7 +863,7 @@ ${convoText}`;
 
     <div style={{ width:"100vw",height:"100dvh",background:"#000",display:"flex",justifyContent:"center",overflow:"hidden" }}>
 
-    <div style={{ width:"min(390px,100vw)",height:"100%",overflow:"hidden",position:"relative",background:"#020810",fontFamily:"'Noto Sans KR',sans-serif",flexShrink:0 }}>
+    <div style={{ width:"min(390px,100vw)",height:"100%",overflow:"hidden",position:"relative",background:"#020810",fontFamily:"'Noto Sans KR',sans-serif",flexShrink:0,transform:`translateY(-${kbShift}px)`,transition:"transform .15s ease-out" }}>
 
       <style>{`
 
@@ -900,9 +897,7 @@ ${convoText}`;
 
         objectFit:"cover", objectPosition:"center top",
 
-        transform:`translateY(-${bgShift}px)`,
-
-        transition:"transform .15s ease-out",
+        transition:"none",
 
         zIndex:1, userSelect:"none", pointerEvents:"none",
 
@@ -916,11 +911,9 @@ ${convoText}`;
 
         position:"absolute",
 
-        left:"58%", top:`calc(27% - ${moonShift}px)`,
+        left:"58%", top:"27%",
 
         transform:"translate(-50%, -50%)",
-
-        transition:"top .15s ease-out",
 
         zIndex:5,
 
@@ -1012,11 +1005,9 @@ ${convoText}`;
 
         position:"absolute",
 
-        bottom:`calc(0px + ${personShift}px)`,
+        bottom:0,
 
         left:0, right:0,
-
-        transition:"bottom .15s ease-out",
 
         zIndex:8,
 
@@ -1112,15 +1103,13 @@ ${convoText}`;
 
       <div style={{
 
-        position:"absolute", bottom:kbShift, left:0, right:0,
+        position:"absolute", bottom:0, left:0, right:0,
 
         padding:"10px 14px 18px",
 
         background:"linear-gradient(0deg,rgba(2,5,12,.98) 70%,transparent)",
 
         zIndex:50,
-
-        transition:"bottom .2s ease-out",
 
       }}
 
