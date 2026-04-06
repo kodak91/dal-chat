@@ -11,17 +11,24 @@ const IMG_MOON="/moon.png";
 
 const IMG_PERSON="/person.png";
 
+const IMG_DAY="/day.png";
+
 
 
 // ── 메모리 상수 ────────────────────────────────────────
 
 const SHORT_TTL = 14 * 24 * 60 * 60 * 1000; // 14일
 
+const DAY_START_H = 5;
+const DAY_END_H   = 17;
+const SLEEP_AT    = 50;
+const LOCK_AT     = 60;
+
 const LONG_KEY    = "dal:memory:long";
 const SHORT_KEY   = "dal:memory:short";
 const ONBOARD_KEY = "dal:onboarding";
 
-const defaultLong = () => ({ name: null, age: null, purpose: null, facts: [], lastUpdated: null });
+const defaultLong = () => ({ name: null, age: null, purpose: null, facts: [], prefs: [], lastUpdated: null });
 const defaultShort = () => [];
 const defaultOnboard = () => ({ totalMessages: 0 });
 
@@ -34,9 +41,11 @@ function pruneShort(arr) {
 
 // ── 시스템 프롬프트 ────────────────────────────────────
 
-const buildSystemPrompt = (longMem, shortMem, onboarding) => {
+const buildSystemPrompt = (longMem, shortMem, onboarding, dailyMem = [], initTime = null) => {
   const now = Date.now();
   let memSection = "";
+
+  if (initTime) memSection += `\n\n[대화 시작 시간]: ${initTime}`;
 
   // 장기 기억
   const longParts = [];
@@ -59,6 +68,16 @@ const buildSystemPrompt = (longMem, shortMem, onboarding) => {
     memSection += `\n\n[최근에 있었던 일]\n${lines}`;
   }
 
+  // 오늘 이전 대화 요약
+  if (dailyMem.length) {
+    memSection += `\n\n[오늘 이전 대화 요약]\n${dailyMem.map(d => d.summary).join('\n---\n')}`;
+  }
+
+  // 사용자 말투/성격 요청
+  if (longMem.prefs?.length) {
+    memSection += `\n\n[사용자 말투/성격 요청 — 참고만, 기본 성격 침해 금지]: ${longMem.prefs.join(', ')}`;
+  }
+
   // 온보딩: 모르는 것 자연스럽게 하나씩 질문
   const total = onboarding?.totalMessages || 0;
   const missing = [];
@@ -67,6 +86,8 @@ const buildSystemPrompt = (longMem, shortMem, onboarding) => {
   if (missing.length && total <= 30) {
     memSection += `\n\n[참고]: 아직 모르는 것이 있어 — "${missing[0]}". 대화 흐름상 자연스러울 때 슬쩍 한 번만 물어봐. 억지로 물어볼 필요는 없어.`;
   }
+
+  if (total >= SLEEP_AT) memSection += `\n\n[참고]: 오늘 대화 많이 했어. 슬슬 졸려와. 자연스럽게 피곤함 드러내도 돼.`;
 
   return `${dalPersonality.trim()}${memSection}`;
 };
@@ -378,6 +399,14 @@ export default function DalChat() {
 
   const [bubbleKey, setBubbleKey]      = useState(0);
 
+  const [isDayMode, setIsDayMode]      = useState(false);
+
+  const [dayResetMsg, setDayResetMsg]  = useState(null);
+
+  const [isLocked, setIsLocked]        = useState(false);
+
+  const [dailyMem, setDailyMem]        = useState([]);
+
   // 키보드 패럴랙스
 
   const [kbShift, setKbShift]          = useState(0);
@@ -395,6 +424,13 @@ export default function DalChat() {
   const onboardingRef                  = useRef(defaultOnboard());
 
   const typeTimerRef                   = useRef(null);
+
+  const initTimeRef                    = useRef(null);
+
+  const dailyMemRef                    = useRef([]);
+
+  const compressedUntilRef             = useRef(0);
+
 
 
 
@@ -418,6 +454,13 @@ export default function DalChat() {
     } catch {}
 
     try { const r = localStorage.getItem("dal:diaries"); if(r) setDiaries(JSON.parse(r) || []); } catch {}
+
+    try { const r = sessionStorage.getItem("dal:memory:daily"); if(r){const d=JSON.parse(r);setDailyMem(d);dailyMemRef.current=d;} } catch {}
+
+    initTimeRef.current = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', hour12:false});
+
+    const h = new Date().getHours();
+    if (h >= DAY_START_H && h < DAY_END_H) setIsDayMode(true);
 
     taRef.current?.focus();
 
@@ -568,7 +611,8 @@ export default function DalChat() {
     "age": "나이 숫자 (확실할 때만, 아니면 null)",
     "purpose": "달 찾는 주 목적 — 하소연/장난/화풀이/대화 중 하나로, 불명확하면 null",
     "newFacts": ["새롭게 알게 된 영구적 사실 (직업·가족·취미 등, 없으면 빈 배열)"]
-  }
+  },
+  "prefUpdates": ["사용자가 달에게 원하는 말투/성격 변화 키워드 (예: '말 적게', '영어로', '다정하게'), 없으면 빈 배열"]
 }
 
 대화:
@@ -613,6 +657,14 @@ ${convoText}`;
         updatedLong.facts = [...existing].slice(-15);
       }
       updatedLong.lastUpdated = now;
+
+      // 사용자 말투/성격 요청 업데이트
+      if (ext.prefUpdates?.length) {
+        const ep = new Set(updatedLong.prefs||[]);
+        ext.prefUpdates.filter(p=>p&&p.trim()).forEach(p=>ep.add(p.trim()));
+        updatedLong.prefs = [...ep].slice(-10);
+      }
+
       longMemRef.current = updatedLong;
       setLongMem(updatedLong);
       localStorage.setItem(LONG_KEY, JSON.stringify(updatedLong));
@@ -623,9 +675,54 @@ ${convoText}`;
 
 
 
+  // ── 일일 메모리 압축 ──────────────────────────────────
+
+  const compressDailyMem = useCallback(async (oldMessages) => {
+    if (!oldMessages.length) return;
+    const convoText = oldMessages.map(m => (m.role==="user"?"나":"달")+": "+m.content).join("\n");
+    try {
+      const res = await fetch("/api/chat", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model:"claude-haiku-4-5-20251001", max_tokens:120,
+          messages:[{role:"user",content:`다음 대화를 핵심만 2-3줄로 요약해. 감정·사건·맥락만:\n${convoText}`}]
+        })
+      });
+      const data = await res.json();
+      const summary = (data.content?.[0]?.text||"").trim();
+      if (!summary) return;
+      const updated = [...dailyMemRef.current, {summary, ts:Date.now()}];
+      dailyMemRef.current = updated;
+      setDailyMem(updated);
+      sessionStorage.setItem("dal:memory:daily", JSON.stringify(updated));
+    } catch {}
+  }, []);
+
+
+
+  // ── 낮 모드 리셋 ─────────────────────────────────────
+
+  const handleDayReset = () => {
+    const h = new Date().getHours();
+    if (h < DAY_START_H || h >= DAY_END_H) {
+      setIsDayMode(false);
+      setDayResetMsg(null);
+      setMessages([]);
+      setMoonBubble("오늘 밤엔 참 조용하네.\n뭔 일 있어?");
+      setUserBubble("");
+      setIsLocked(false);
+    } else {
+      setDayResetMsg("오후 5시 이후에 와줘 🌙");
+    }
+  };
+
+
+
   // ── SEND ─────────────────────────────────────────────
 
   const send = useCallback(async () => {
+
+    if (isLocked || isDayMode) return;
 
     const text = input.trim();
 
@@ -659,6 +756,12 @@ ${convoText}`;
 
     setStreamText("");
 
+    if (newOnboard.totalMessages >= LOCK_AT) {
+      startTypewriter("미안한데 이제 가봐야겠다. 나중에 다시 보자.");
+      setIsLocked(true);
+      return;
+    }
+
     setIsStreaming(true);
 
     let full = "";
@@ -677,11 +780,11 @@ ${convoText}`;
 
           max_tokens: 300,
 
-          system: buildSystemPrompt(longMemRef.current, shortMemRef.current, onboardingRef.current),
+          system: buildSystemPrompt(longMemRef.current, shortMemRef.current, onboardingRef.current, dailyMemRef.current, initTimeRef.current),
 
           stream: true,
 
-          messages: history.slice(-10),
+          messages: history.slice(-20),
 
         }),
 
@@ -754,6 +857,13 @@ ${convoText}`;
         extractAndSaveMemories(finalHistory);
       }
 
+      // 일일 대화 압축: 10회마다
+      const compressEnd = finalHistory.length - 20;
+      if (userCount % 10 === 0 && compressEnd > compressedUntilRef.current && compressEnd > 0) {
+        const toCompress = finalHistory.slice(compressedUntilRef.current, compressEnd);
+        if (toCompress.length) { compressedUntilRef.current = compressEnd; compressDailyMem(toCompress); }
+      }
+
 
     } catch (e) {
 
@@ -771,7 +881,7 @@ ${convoText}`;
 
     }
 
-  }, [input, isStreaming, messages, startTypewriter, extractAndSaveMemories]);
+  }, [input, isStreaming, messages, startTypewriter, extractAndSaveMemories, compressDailyMem, isLocked, isDayMode]);
 
 
 
@@ -886,6 +996,24 @@ ${convoText}`;
         ::-webkit-scrollbar-thumb{background:#14203a}
 
       `}</style>
+
+
+
+      {/* ── 낮 모드 오버레이 ── */}
+
+      {isDayMode && (
+        <div style={{ position:"absolute",inset:0,zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end" }}>
+          <img src={IMG_DAY} alt="" style={{ position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top" }} />
+          {dayResetMsg && (
+            <div style={{ position:"absolute",top:60,right:14,background:"rgba(255,200,80,.12)",border:"1px solid rgba(255,200,80,.3)",color:"#e8c828",fontSize:12,padding:"7px 12px",fontFamily:"'Noto Sans KR',sans-serif",zIndex:201,backdropFilter:"blur(4px)" }}>
+              {dayResetMsg}
+            </div>
+          )}
+          <div style={{ position:"relative",zIndex:201,marginBottom:120,maxWidth:"min(240px,70vw)",padding:"13px 18px",background:"rgba(18,12,2,.93)",border:"1.5px solid #5a4208",color:"#e8c828",fontSize:"clamp(11px,3.5vw,13px)",lineHeight:1.8,fontFamily:"'Noto Sans KR',sans-serif",boxShadow:"0 3px 20px rgba(0,0,0,.8)",textAlign:"center",whiteSpace:"pre-wrap" }}>
+            {"지금은 달이 잘 안보이네..\n나중에 와야지"}
+          </div>
+        </div>
+      )}
 
 
 
@@ -1091,6 +1219,8 @@ ${convoText}`;
 
       <div style={{ position:"absolute",top:14,right:14,zIndex:100,display:"flex",gap:7 }}>
 
+        <button onClick={handleDayReset} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #5a4208",color:"#7a5a10",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>↺</button>
+
         <button onClick={()=>{setShowDiaries(true);setShowHistory(false);}} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #5a4208",color:"#7a5a10",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>📔</button>
 
         <button onClick={()=>{setShowHistory(true);setShowDiaries(false);}} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #5a4208",color:"#7a5a10",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>기록</button>
@@ -1119,23 +1249,23 @@ ${convoText}`;
 
         <div style={{ display:"flex",alignItems:"flex-end",gap:9,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"8px 12px",backdropFilter:"blur(4px)" }}>
 
-          <textarea ref={taRef} value={input} onChange={onInput} onKeyDown={onKey} disabled={isStreaming}
+          <textarea ref={taRef} value={input} onChange={onInput} onKeyDown={onKey} disabled={isStreaming||isDayMode||isLocked}
 
             placeholder="달에게 말 걸어봐..."
 
             style={{ flex:1,background:"transparent",border:"none",color:"#8898b4",fontSize:14,fontFamily:"'Noto Sans KR',sans-serif",resize:"none",lineHeight:1.55,height:44,maxHeight:100,overflow:"auto",caretColor:"#4878b8" }} />
 
-          <button onClick={send} disabled={isStreaming||!input.trim()} style={{
+          <button onClick={send} disabled={isStreaming||!input.trim()||isDayMode||isLocked} style={{
 
             width:36,height:36,flexShrink:0,
 
-            background:isStreaming||!input.trim()?"rgba(8,13,26,.8)":"rgba(14,28,56,.9)",
+            background:isStreaming||!input.trim()||isDayMode||isLocked?"rgba(8,13,26,.8)":"rgba(14,28,56,.9)",
 
-            border:`1px solid ${isStreaming||!input.trim()?"#2a1a00":"#5a4208"}`,
+            border:`1px solid ${isStreaming||!input.trim()||isDayMode||isLocked?"#2a1a00":"#5a4208"}`,
 
-            color:isStreaming||!input.trim()?"#2a1a00":"#c8a020",
+            color:isStreaming||!input.trim()||isDayMode||isLocked?"#2a1a00":"#c8a020",
 
-            cursor:isStreaming||!input.trim()?"not-allowed":"pointer",
+            cursor:isStreaming||!input.trim()||isDayMode||isLocked?"not-allowed":"pointer",
 
             fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",
 
