@@ -36,7 +36,13 @@ function pruneShort(arr) {
 
 const buildSystemPrompt = (longMem, shortMem, onboarding) => {
   const now = Date.now();
-  let memSection = "";
+  const hour = new Date().getHours();
+  const timeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const isActive = hour >= 17 || hour < 5;
+  const timeContext = isActive
+    ? `[현재 시각: ${timeStr}] 달의 활동 시간. 평소대로 대화해.`
+    : `[현재 시각: ${timeStr}] 달의 비활동 시간(낮). 아직 활동할 때가 아니라 귀찮아하거나 짧게 대답해. 그래도 얘기하고 싶어하면 들어줘.`;
+  let memSection = `\n\n${timeContext}`;
 
   // 장기 기억
   const longParts = [];
@@ -1073,7 +1079,7 @@ ${convoText}`;
 
         <img src={IMG_PERSON} alt="" style={{
 
-          width:"75%",
+          width:"90%",
 
           height:"auto",
 
@@ -1081,9 +1087,11 @@ ${convoText}`;
 
           objectFit:"contain",
 
-          objectPosition:"left bottom",
+          objectPosition:"center bottom",
 
           display:"block",
+
+          margin:"0 auto",
 
           userSelect:"none",
 
@@ -1111,11 +1119,13 @@ ${convoText}`;
 
       <div style={{
 
-        position:"absolute", bottom:0, left:0, right:0,
+        position:"absolute", bottom:kbShift, left:0, right:0,
 
         padding:"10px 14px 18px",
 
         background:"linear-gradient(0deg,rgba(2,5,12,.98) 70%,transparent)",
+
+        transition:"bottom .15s ease-out",
 
         zIndex:50,
 
@@ -1125,7 +1135,7 @@ ${convoText}`;
 
       >
 
-        <div style={{ display:"flex",alignItems:"flex-end",gap:9,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"8px 12px",backdropFilter:"blur(4px)" }}>
+        <div style={{ display:"flex",alignItems:"center",gap:9,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"8px 12px",backdropFilter:"blur(4px)" }}>
 
           <textarea ref={taRef} value={input} onChange={onInput} onKeyDown={onKey} disabled={isStreaming}
 
