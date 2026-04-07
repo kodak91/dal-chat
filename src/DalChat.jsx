@@ -59,7 +59,10 @@ function pruneShort(arr) {
 
 const buildSystemPrompt = (longMem, shortMem, onboarding, dailyMem = [], initTime = null) => {
   const now = Date.now();
-  let memSection = "";
+  const hour = new Date().getHours();
+  const timeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const timeContext = `[현재 시각: ${timeStr}]`;
+  let memSection = `\n\n${timeContext}`;
 
   if (initTime) memSection += `\n\n[대화 시작 시간]: ${initTime}`;
 
@@ -432,6 +435,8 @@ export default function DalChat() {
 
   const vvHeightRef                    = useRef(null);
 
+  const vvWidthRef                     = useRef(null);
+
   const taRef                          = useRef(null);
 
   const longMemRef                     = useRef(defaultLong());
@@ -571,6 +576,8 @@ export default function DalChat() {
     if (!isTouchDevice) return; // 데스크탑은 항상 0
 
     vvHeightRef.current = vv.height;
+
+    vvWidthRef.current  = vv.width;
 
     const handler = () => {
 
@@ -1325,11 +1332,13 @@ ${convoText}`;
 
       <div style={{
 
-        position:"absolute", bottom:0, left:0, right:0,
+        position:"absolute", bottom:kbShift, left:0, right:0,
 
         padding:"10px 14px 18px",
 
         background:"linear-gradient(0deg,rgba(2,5,12,.98) 70%,transparent)",
+
+        transition:"bottom .15s ease-out",
 
         zIndex:50,
 
@@ -1339,7 +1348,7 @@ ${convoText}`;
 
       >
 
-        <div style={{ display:"flex",alignItems:"flex-end",gap:9,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"8px 12px",backdropFilter:"blur(4px)" }}>
+        <div style={{ display:"flex",alignItems:"center",gap:9,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"8px 12px",backdropFilter:"blur(4px)" }}>
 
           <textarea ref={taRef} value={input} onChange={onInput} onKeyDown={onKey} onFocus={() => setTimeout(() => window.scrollTo(0,0), 50)} disabled={isStreaming||isDayMode||(isLocked&&!isDevUnlocked)}
 
