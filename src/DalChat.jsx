@@ -30,6 +30,7 @@ const ONBOARD_KEY  = "dal:onboarding";
 const SESSION_MSGS = "dal:session:messages";  // 세션 메시지 (오후5시~오전5시)
 const SESSION_COMP = "dal:session:compress";  // 압축 인덱스
 const SESSION_DAILY= "dal:session:daily";     // 일일 압축 기억
+const DEV_UNLOCK_KEY = "dal:dev:unlocked";
 
 // 현재 유효한 세션의 시작 timestamp 반환. 낮(오전5시~오후5시)이면 null.
 function getSessionStart() {
@@ -419,6 +420,7 @@ export default function DalChat() {
   const [dayResetMsg, setDayResetMsg]  = useState(null);
 
   const [isLocked, setIsLocked]        = useState(false);
+  const [isDevUnlocked, setIsDevUnlocked] = useState(() => localStorage.getItem(DEV_UNLOCK_KEY) === "1");
 
   const [dailyMem, setDailyMem]        = useState([]);
 
@@ -465,15 +467,24 @@ export default function DalChat() {
       if (r) { const arr = pruneShort(JSON.parse(r)); setShortMem(arr); shortMemRef.current = arr; }
     } catch {}
 
+    // 세션 데이터 복원 (오후5시~오전5시 범위 내면 유지)
+    const sessionStart = getSessionStart();
+
     try {
       const r = localStorage.getItem(ONBOARD_KEY);
-      if (r) { const o = JSON.parse(r); setOnboarding(o); onboardingRef.current = o; }
+      if (r) {
+        const o = JSON.parse(r);
+        // 새 세션이 시작됐는데 totalMessages가 이전 세션 것이면 리셋
+        if (sessionStart && (!o.sessionResetAt || o.sessionResetAt < sessionStart)) {
+          o.totalMessages = 0;
+          o.sessionResetAt = sessionStart;
+          localStorage.setItem(ONBOARD_KEY, JSON.stringify(o));
+        }
+        setOnboarding(o); onboardingRef.current = o;
+      }
     } catch {}
 
     try { const r = localStorage.getItem("dal:diaries"); if(r) setDiaries(JSON.parse(r) || []); } catch {}
-
-    // 세션 데이터 복원 (오후5시~오전5시 범위 내면 유지)
-    const sessionStart = getSessionStart();
     try {
       const r = localStorage.getItem(SESSION_MSGS);
       if (r) {
@@ -786,11 +797,21 @@ ${convoText}`;
 
   const send = useCallback(async () => {
 
-    if (isLocked || isDayMode) return;
+    if ((isLocked && !isDevUnlocked) || isDayMode) return;
 
     const text = input.trim();
 
     if (!text || isStreaming) return;
+
+    // 개발자 잠금 해제 코드
+    if (text === "일어나이새끼야") {
+      localStorage.setItem(DEV_UNLOCK_KEY, "1");
+      setIsDevUnlocked(true);
+      setIsLocked(false);
+      setInput("");
+      startTypewriter("...알았어, 일어날게.");
+      return;
+    }
 
     const isContinuing = text.endsWith("..");
 
@@ -822,7 +843,7 @@ ${convoText}`;
 
     setStreamText("");
 
-    if (newOnboard.totalMessages >= LOCK_AT) {
+    if (newOnboard.totalMessages >= LOCK_AT && !isDevUnlocked) {
       startTypewriter("미안한데 이제 가봐야겠다. 나중에 다시 보자.");
       setIsLocked(true);
       return;
@@ -980,7 +1001,7 @@ ${convoText}`;
 
           model: "claude-sonnet-4-20250514", max_tokens: 700,
 
-          messages: [{ role:"user", content:`오늘(${today}) 달과의 대화를 내가 직접 쓴 일기로 바꿔줘.\n- 1인칭. 내 감정/생각 중심. 달 얘기도 자연스럽게 녹여.\n- 진짜 일기처럼, 구어체로. 200~360자.\nJSON만: {"mood":"오늘기분한단어","moodEmoji":"이모지1개","content":"일기내용"}\n대화:\n${convo}` }],
+          messages: [{ role:"user", content:`아래 대화를 바탕으로 일기를 써줘. 오늘 날짜는 ${today}야.\n\n[규칙]\n- 글 잘 쓰는 작가가 혼자 쓴 사적인 일기체. 담백하고 감성적인 문장.\n- 1인칭. 내 감정과 생각이 중심. 달(AI)과의 대화는 자연스럽게 녹여.\n- 문단을 2~3개로 나눠서 호흡 있게 써줘. 각 문단은 빈 줄로 구분.\n- 250~400자. 과장 없이, 꾸밈 없이. 일어난 일 나열 금지.\n- JSON만 반환: {"mood":"오늘기분한단어","moodEmoji":"이모지1개","content":"일기내용"}\n\n대화:\n${convo}` }],
 
         }),
 
@@ -1288,7 +1309,7 @@ ${convoText}`;
 
       {/* ── 상단 버튼 ── */}
 
-      <div style={{ position:"absolute",top:14,right:14,zIndex:100,display:"flex",gap:7 }}>
+      <div style={{ position:"absolute",top:14,right:14,zIndex:202,display:"flex",gap:7 }}>
 
         <button onClick={handleDayReset} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #5a4208",color:"#7a5a10",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>↺</button>
 
@@ -1320,23 +1341,23 @@ ${convoText}`;
 
         <div style={{ display:"flex",alignItems:"flex-end",gap:9,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"8px 12px",backdropFilter:"blur(4px)" }}>
 
-          <textarea ref={taRef} value={input} onChange={onInput} onKeyDown={onKey} onFocus={() => setTimeout(() => window.scrollTo(0,0), 50)} disabled={isStreaming||isDayMode||isLocked}
+          <textarea ref={taRef} value={input} onChange={onInput} onKeyDown={onKey} onFocus={() => setTimeout(() => window.scrollTo(0,0), 50)} disabled={isStreaming||isDayMode||(isLocked&&!isDevUnlocked)}
 
             placeholder="달에게 말 걸어봐..."
 
             style={{ flex:1,background:"transparent",border:"none",color:"#8898b4",fontSize:14,fontFamily:"'Noto Sans KR',sans-serif",resize:"none",lineHeight:1.55,height:44,maxHeight:100,overflow:"auto",caretColor:"#4878b8" }} />
 
-          <button onClick={send} disabled={isStreaming||!input.trim()||isDayMode||isLocked} style={{
+          <button onClick={send} disabled={isStreaming||!input.trim()||isDayMode||(isLocked&&!isDevUnlocked)} style={{
 
             width:36,height:36,flexShrink:0,
 
-            background:isStreaming||!input.trim()||isDayMode||isLocked?"rgba(8,13,26,.8)":"rgba(14,28,56,.9)",
+            background:isStreaming||!input.trim()||isDayMode||(isLocked&&!isDevUnlocked)?"rgba(8,13,26,.8)":"rgba(14,28,56,.9)",
 
-            border:`1px solid ${isStreaming||!input.trim()||isDayMode||isLocked?"#2a1a00":"#5a4208"}`,
+            border:`1px solid ${isStreaming||!input.trim()||isDayMode||(isLocked&&!isDevUnlocked)?"#2a1a00":"#5a4208"}`,
 
-            color:isStreaming||!input.trim()||isDayMode||isLocked?"#2a1a00":"#c8a020",
+            color:isStreaming||!input.trim()||isDayMode||(isLocked&&!isDevUnlocked)?"#2a1a00":"#c8a020",
 
-            cursor:isStreaming||!input.trim()||isDayMode||isLocked?"not-allowed":"pointer",
+            cursor:isStreaming||!input.trim()||isDayMode||(isLocked&&!isDevUnlocked)?"not-allowed":"pointer",
 
             fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",
 
