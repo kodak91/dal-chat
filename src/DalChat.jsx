@@ -7,11 +7,11 @@ import dalPersonality from "./prompts/dal-personality.txt?raw";
 
 const IMG_BG="/bg.png";
 
+const IMG_DAY="/day.png";
+
 const IMG_MOON="/moon.png";
 
 const IMG_PERSON="/person.png";
-
-const IMG_DAY="/day.png";
 
 
 
@@ -433,6 +433,11 @@ export default function DalChat() {
 
   const [isTyping, setIsTyping]        = useState(false);
 
+  // PWA 설치
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstall, setShowInstall]     = useState(false);
+  const installDismissed = useRef(false);
+
   const vvHeightRef                    = useRef(null);
 
   const vvWidthRef                     = useRef(null);
@@ -522,6 +527,47 @@ export default function DalChat() {
   }, []);
 
 
+
+  // PWA 설치 프롬프트
+  useEffect(() => {
+    if (localStorage.getItem("dal:installed")) return;
+
+    // Android/Chrome: beforeinstallprompt 이벤트 캡처
+    const onPrompt = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setShowInstall(true);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+
+    // iOS Safari: standalone 모드가 아니면 안내 표시
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone === true;
+    if (isIos && !isStandalone) {
+      setShowInstall(true);
+    }
+
+    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+  }, []);
+
+  const handleInstall = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === "accepted") {
+        localStorage.setItem("dal:installed", "1");
+      }
+      setInstallPrompt(null);
+    }
+    setShowInstall(false);
+    installDismissed.current = true;
+  };
+
+  const dismissInstall = () => {
+    setShowInstall(false);
+    installDismissed.current = true;
+    localStorage.setItem("dal:installed", "1");
+  };
 
   // 메시지 변경 시 세션 localStorage에 저장
   useEffect(() => {
@@ -1064,6 +1110,9 @@ ${convoText}`;
 
 
 
+  // iOS 여부 (설치 배너용)
+  const isIosBrowser = /iphone|ipad|ipod/i.test(navigator.userAgent) && window.navigator.standalone !== true;
+
   // 키보드 올라올 때 전체 씬을 한 덩어리로 올리기 위해 컨테이너 transform 사용
 
 
@@ -1387,6 +1436,40 @@ ${convoText}`;
       {showHistory && <HistoryPanel messages={messages} streamingText={streamingText} longMem={longMem} shortMem={shortMem} onClose={()=>setShowHistory(false)} onMakeDiary={makeDiary} diaryLoading={diaryLoading} onOpenDiaries={()=>{setShowDiaries(true);setShowHistory(false);}} />}
 
       {showDiaries && <DiaryModal diaries={diaries} onClose={()=>setShowDiaries(false)} />}
+
+      {/* ── PWA 설치 배너 ── */}
+      {showInstall && (
+        <div style={{
+          position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
+          width:"min(390px,100vw)", zIndex:500,
+          background:"rgba(4,8,20,.97)", borderTop:"1px solid #1a2a4a",
+          padding:"16px 20px 28px", fontFamily:"'Noto Sans KR',sans-serif",
+          animation:"slideUp .28s cubic-bezier(.34,1.56,.64,1) forwards",
+        }}>
+          <style>{`@keyframes slideUp{from{transform:translateX(-50%) translateY(100%)}to{transform:translateX(-50%) translateY(0)}}`}</style>
+          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:14 }}>
+            <div>
+              <div style={{ color:"#c8a820", fontSize:15, fontWeight:600, marginBottom:4 }}>🌙 달챗 홈 화면에 추가</div>
+              <div style={{ color:"#4a6080", fontSize:12, lineHeight:1.6 }}>
+                {isIosBrowser
+                  ? <>Safari 하단 공유 버튼(<span style={{fontSize:13}}>⎙</span>)을 누른 뒤<br/>「홈 화면에 추가」를 선택해줘</>
+                  : "홈 화면에 추가하면 앱처럼 바로 열 수 있어"
+                }
+              </div>
+            </div>
+            <button onClick={dismissInstall} style={{ background:"none", border:"none", color:"#2a3a50", fontSize:20, cursor:"pointer", padding:0, lineHeight:1, flexShrink:0 }}>✕</button>
+          </div>
+          {!isIosBrowser && (
+            <button onClick={handleInstall} style={{
+              width:"100%", padding:"12px", background:"rgba(14,28,56,.9)",
+              border:"1px solid #5a4208", color:"#c8a020", fontSize:14,
+              fontFamily:"inherit", cursor:"pointer", fontWeight:600,
+            }}>
+              홈 화면에 추가
+            </button>
+          )}
+        </div>
+      )}
 
     </div>
 
