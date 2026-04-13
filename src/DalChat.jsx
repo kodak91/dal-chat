@@ -1150,7 +1150,7 @@ ${convoText}`;
       {/* ── 낮 모드 오버레이 ── */}
 
       {isDayMode && (
-        <div style={{ position:"absolute",inset:0,zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",backgroundImage:`url(${IMG_DAY})`,backgroundSize:"cover",backgroundPosition:"center top" }}>
+        <div style={{ position:"absolute",top:0,left:0,right:0,bottom:0,width:"100%",height:"100%",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",backgroundImage:`url('${IMG_DAY}')`,backgroundSize:"cover",backgroundPosition:"center top" }}>
           {dayResetMsg && (
             <div style={{ position:"absolute",top:60,right:14,background:"rgba(255,200,80,.12)",border:"1px solid rgba(255,200,80,.3)",color:"#e8c828",fontSize:12,padding:"7px 12px",fontFamily:"'Noto Sans KR',sans-serif",zIndex:201,backdropFilter:"blur(4px)" }}>
               {dayResetMsg}
