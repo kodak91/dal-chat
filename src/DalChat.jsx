@@ -736,7 +736,7 @@ ${convoText}`;
 
     try {
 
-      const res = await fetch("/api/chat", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -797,7 +797,7 @@ ${convoText}`;
     if (!oldMessages.length) return;
     const convoText = oldMessages.map(m => (m.role==="user"?"나":"달")+": "+m.content).join("\n");
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/chat`, {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           model:"claude-haiku-4-5-20251001", max_tokens:120,
@@ -900,7 +900,7 @@ ${convoText}`;
 
     try {
 
-      const res = await fetch("/api/chat", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/chat`, {
 
         method: "POST",
 
@@ -1036,7 +1036,7 @@ ${convoText}`;
 
       const today = new Date().toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"long"});
 
-      const res = await fetch("/api/chat", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/chat`, {
 
         method: "POST",
 
