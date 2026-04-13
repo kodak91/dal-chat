@@ -266,6 +266,20 @@ function HistoryPanel({ messages, streamingText, longMem, shortMem, onClose, onM
 
       <div style={{ flex:1,overflowY:"auto",padding:"14px" }}>
 
+        {/* ── 광고 카드 (달 말풍선 스타일) ── */}
+        <div style={{ marginBottom:10,display:"flex",flexDirection:"column",alignItems:"flex-start" }}>
+          <div style={{ fontSize:10,color:"#243448",marginBottom:3 }}>🌙 달</div>
+          <div style={{ maxWidth:"86%",padding:"8px 12px",background:"#0d0c02",border:"1px solid #281e04",color:"#c8aa30",fontSize:12,lineHeight:1.75,wordBreak:"break-word",whiteSpace:"pre-wrap" }}>
+            {"부끄러운 얘기지만, 나는 밥은 안 먹지만 토큰은 먹는다.\n후원 대신에 한번 봐주라.\n참고로 머리는 밤에 감는 게 좋단다.\n이거 한번 써봐."}
+            <div style={{ marginTop:6 }}>
+              <a href="https://www.wadiz.kr/web/wcomingsoon/rwd/393687" target="_blank" rel="noreferrer" style={{ color:"#8060c0",fontSize:12,textDecoration:"none" }}>→ 와디즈에서 보기</a>
+            </div>
+            <a href="https://www.wadiz.kr/web/wcomingsoon/rwd/393687" target="_blank" rel="noreferrer" style={{ display:"block",marginTop:8 }}>
+              <img src="/scoop_ad.png" alt="" style={{ width:"100%",borderRadius:8,display:"block" }} />
+            </a>
+          </div>
+        </div>
+
         {!messages.length && <div style={{ color:"#182030",textAlign:"center",marginTop:40,fontSize:12 }}>아직 대화가 없어</div>}
 
         {messages.map((m,i) => {
