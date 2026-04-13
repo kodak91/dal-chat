@@ -1,25 +1,32 @@
 import { useState } from "react";
 import emailjs from "@emailjs/browser";
+import ReactGA from "react-ga4";
 
 const SERVICE_ID  = "service_dal_chat";
 const TEMPLATE_ID = "template_9cz1xj5";
 
 export default function FeedbackModal({ onClose }) {
   const [text, setText]     = useState("");
-  const [status, setStatus] = useState("idle"); // idle | sending | done
+  const [status, setStatus] = useState("idle"); // idle | sending | done | failed
 
   const submit = async () => {
-    if (!text.trim() || status !== "idle") return;
+    if (!text.trim() || status === "sending" || status === "done") return;
     setStatus("sending");
     try {
       await emailjs.send(SERVICE_ID, TEMPLATE_ID, {
         message: text.trim(),
         time: new Date().toLocaleString("ko-KR"),
       });
-    } catch {}
-    setStatus("done");
-    setTimeout(onClose, 1500);
+      ReactGA.event({ category: "Feedback", action: "submitted" });
+      setStatus("done");
+      setTimeout(onClose, 1500);
+    } catch {
+      setStatus("failed");
+    }
   };
+
+  const btnLabel = { sending: "...", done: "비둘기 서신으로 보냈음", failed: "다시 시도" }[status] ?? "보내기";
+  const isFailed = status === "failed";
 
   return (
     <div
@@ -54,12 +61,12 @@ export default function FeedbackModal({ onClose }) {
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
-          disabled={status !== "idle"}
+          disabled={status === "sending" || status === "done"}
           placeholder="아무 말이나 해도 돼"
           style={{
             width:"100%", height:110, resize:"none",
             background:"rgba(255,255,255,.04)",
-            border:"1px solid #2a1f4a",
+            border:`1px solid ${isFailed ? "#6a2020" : "#2a1f4a"}`,
             color:"#c8b8e8", fontSize:14, lineHeight:1.7,
             fontFamily:"inherit", padding:"10px 12px",
             boxSizing:"border-box",
@@ -69,19 +76,19 @@ export default function FeedbackModal({ onClose }) {
 
         {/* 전송 버튼 */}
         <button
-          onClick={submit}
-          disabled={status !== "idle" || !text.trim()}
+          onClick={isFailed ? () => setStatus("idle") : submit}
+          disabled={status === "sending" || status === "done" || (!isFailed && !text.trim())}
           style={{
             marginTop:12, width:"100%", padding:"11px",
-            background: status === "done" ? "rgba(30,15,50,.9)" : "rgba(40,20,70,.9)",
-            border:`1px solid ${status === "done" ? "#4a2f7a" : "#5a3a90"}`,
-            color: status === "done" ? "#7a60a8" : (text.trim() ? "#c8a8f0" : "#4a3a60"),
+            background: status === "done" ? "rgba(30,15,50,.9)" : isFailed ? "rgba(50,10,10,.9)" : "rgba(40,20,70,.9)",
+            border:`1px solid ${status === "done" ? "#4a2f7a" : isFailed ? "#7a2020" : "#5a3a90"}`,
+            color: status === "done" ? "#7a60a8" : isFailed ? "#c05050" : (text.trim() ? "#c8a8f0" : "#4a3a60"),
             fontSize:14, fontWeight:600, fontFamily:"inherit",
-            cursor: status === "idle" && text.trim() ? "pointer" : "default",
+            cursor: (status === "idle" && text.trim()) || isFailed ? "pointer" : "default",
             transition:"color .2s, border-color .2s",
           }}
         >
-          {status === "sending" ? "..." : status === "done" ? "비둘기 서신으로 보냈음" : "보내기"}
+          {btnLabel}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import dalPersonality from "./prompts/dal-personality.txt?raw";
 import FeedbackModal from "./FeedbackModal.jsx";
+import ReactGA from "react-ga4";
 
 
 
@@ -886,6 +887,8 @@ ${convoText}`;
     setMessages(history);
 
     setInput("");
+
+    ReactGA.event({ category: "Chat", action: "send_message" });
 
     setUserBubble(displayText);
 
