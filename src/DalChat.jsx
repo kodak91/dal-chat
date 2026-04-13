@@ -1150,16 +1150,7 @@ ${convoText}`;
       {/* ── 낮 모드 오버레이 ── */}
 
       {isDayMode && (
-        <div style={{ position:"absolute",top:0,left:0,right:0,bottom:0,width:"100%",height:"100%",zIndex:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",backgroundImage:`url('${IMG_DAY}')`,backgroundSize:"cover",backgroundPosition:"center top" }}>
-          {dayResetMsg && (
-            <div style={{ position:"absolute",top:60,right:14,background:"rgba(255,200,80,.12)",border:"1px solid rgba(255,200,80,.3)",color:"#e8c828",fontSize:12,padding:"7px 12px",fontFamily:"'Noto Sans KR',sans-serif",zIndex:201,backdropFilter:"blur(4px)" }}>
-              {dayResetMsg}
-            </div>
-          )}
-          <div style={{ position:"relative",zIndex:201,marginBottom:120,maxWidth:"min(240px,70vw)",padding:"13px 18px",background:"rgba(18,12,2,.93)",border:"1.5px solid #5a4208",color:"#e8c828",fontSize:"clamp(11px,3.5vw,13px)",lineHeight:1.8,fontFamily:"'Noto Sans KR',sans-serif",boxShadow:"0 3px 20px rgba(0,0,0,.8)",textAlign:"center",whiteSpace:"pre-wrap" }}>
-            {"지금은 달이 잘 안보이네..\n나중에 와야지"}
-          </div>
-        </div>
+        <img src={IMG_DAY} alt="" style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top",zIndex:200,userSelect:"none",pointerEvents:"none" }} />
       )}
 
 
