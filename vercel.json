@@ -1,6 +1,3 @@
 {
-  "buildCommand": "node node_modules/vite/bin/vite.js build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "framework": null
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

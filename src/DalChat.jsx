@@ -418,7 +418,10 @@ export default function DalChat() {
 
   const [bubbleKey, setBubbleKey]      = useState(0);
 
-  const [isDayMode, setIsDayMode]      = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  const [isDayMode, setIsDayMode]      = useState(() => { const h = new Date().getHours(); return h >= DAY_START_H && h < DAY_END_H; });
 
   const [dayResetMsg, setDayResetMsg]  = useState(null);
 
@@ -519,9 +522,6 @@ export default function DalChat() {
 
     initTimeRef.current = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', hour12:false});
 
-    const h = new Date().getHours();
-    if (h >= DAY_START_H && h < DAY_END_H) setIsDayMode(true);
-
     taRef.current?.focus();
 
   }, []);
@@ -605,6 +605,16 @@ export default function DalChat() {
       document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
     };
+  }, []);
+
+  // PWA 설치 프롬프트 (Android Chrome)
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (isStandalone) return;
+    if (localStorage.getItem('dal:install:dismissed')) return;
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowInstallBanner(true); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
 
@@ -1146,6 +1156,17 @@ ${convoText}`;
       `}</style>
 
 
+
+      {/* ── PWA 설치 배너 ── */}
+      {showInstallBanner && (
+        <div style={{ position:"fixed",bottom:0,left:0,right:0,zIndex:400,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",background:"rgba(10,8,20,0.97)",borderTop:"1px solid #2a1f4a",fontFamily:"'Noto Sans KR',sans-serif" }}>
+          <span style={{ color:"#c9b8f0",fontSize:13,lineHeight:1.5 }}>{"홈 화면에 추가하면\n더 편하게 달 만날 수 있어"}</span>
+          <div style={{ display:"flex",gap:8,flexShrink:0 }}>
+            <button onClick={async () => { setShowInstallBanner(false); if (installPrompt) { installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); } }} style={{ padding:"7px 14px",background:"#3d2f70",border:"none",borderRadius:8,color:"#e0d4ff",fontSize:13,cursor:"pointer" }}>추가</button>
+            <button onClick={() => { setShowInstallBanner(false); localStorage.setItem('dal:install:dismissed','1'); }} style={{ padding:"7px 10px",background:"transparent",border:"none",color:"#6b5d8a",fontSize:18,cursor:"pointer",lineHeight:1 }}>✕</button>
+          </div>
+        </div>
+      )}
 
       {/* ── 낮 모드 오버레이 ── */}
 
