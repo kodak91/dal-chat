@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import dalPersonality from "./prompts/dal-personality.txt?raw";
+import FeedbackModal from "./FeedbackModal.jsx";
 
 
 
@@ -437,6 +438,7 @@ export default function DalChat() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall, setShowInstall]     = useState(false);
   const installDismissed = useRef(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const vvHeightRef                    = useRef(null);
 
@@ -1362,6 +1364,8 @@ ${convoText}`;
 
       <div style={{ position:"absolute",top:14,right:14,zIndex:202,display:"flex",gap:7 }}>
 
+        <button onClick={() => setShowFeedback(true)} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #2a1f4a",color:"#5a4880",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>✉</button>
+
         <button onClick={handleDayReset} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #5a4208",color:"#7a5a10",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>↺</button>
 
         <button onClick={()=>{setShowDiaries(true);setShowHistory(false);}} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #5a4208",color:"#7a5a10",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>📔</button>
@@ -1431,6 +1435,8 @@ ${convoText}`;
       {showHistory && <HistoryPanel messages={messages} streamingText={streamingText} longMem={longMem} shortMem={shortMem} onClose={()=>setShowHistory(false)} onMakeDiary={makeDiary} diaryLoading={diaryLoading} onOpenDiaries={()=>{setShowDiaries(true);setShowHistory(false);}} />}
 
       {showDiaries && <DiaryModal diaries={diaries} onClose={()=>setShowDiaries(false)} />}
+
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       {/* ── PWA 설치 배너 ── */}
       {showInstall && (
