@@ -443,10 +443,6 @@ export default function DalChat() {
 
   const [dailyMem, setDailyMem]        = useState([]);
 
-  // 키보드 패럴랙스
-
-  const [kbShift, setKbShift]          = useState(0);
-
   const [isTyping, setIsTyping]        = useState(false);
 
   // PWA 설치
@@ -454,10 +450,6 @@ export default function DalChat() {
   const [showInstall, setShowInstall]     = useState(false);
   const installDismissed = useRef(false);
   const [showFeedback, setShowFeedback] = useState(false);
-
-  const vvHeightRef                    = useRef(null);
-
-  const vvWidthRef                     = useRef(null);
 
   const taRef                          = useRef(null);
 
@@ -631,43 +623,19 @@ export default function DalChat() {
 
 
 
-  // 키보드 감지: 터치 기기만, 베이스라인 비교 방식 (offsetTop 이벤트 타이밍 문제 회피)
-
+  // 키보드 감지: visualViewport 기준 translateY — iOS/Android 통일 처리
   useEffect(() => {
-
     const vv = window.visualViewport;
-
     if (!vv) return;
-
-    const isTouchDevice = navigator.maxTouchPoints > 0;
-
-    if (!isTouchDevice) return; // 데스크탑은 항상 0
-
-    vvHeightRef.current = vv.height;
-
-    vvWidthRef.current  = vv.width;
-
     const handler = () => {
-
-      const h = vv.height;
-
-      if (h > vvHeightRef.current) vvHeightRef.current = h; // 키보드 닫힐 때 베이스라인 갱신
-
-      // UA로 명확하게 OS 판별: Android는 브라우저가 뷰포트 자동 조정 → kbShift 불필요
-      const isAndroid = /Android/i.test(navigator.userAgent);
-
-      setKbShift(isAndroid ? 0 : Math.max(0, vvHeightRef.current - h));
-
+      const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const el = document.getElementById('chat-input-area');
+      if (el) el.style.transform = keyboardHeight > 0 ? `translateY(-${keyboardHeight}px)` : 'translateY(0)';
       window.scrollTo(0, 0);
-
     };
-
-    vv.addEventListener("resize", handler);
-
-    vv.addEventListener("scroll", handler);
-
-    return () => { vv.removeEventListener("resize", handler); vv.removeEventListener("scroll", handler); };
-
+    vv.addEventListener('resize', handler);
+    vv.addEventListener('scroll', handler);
+    return () => { vv.removeEventListener('resize', handler); vv.removeEventListener('scroll', handler); };
   }, []);
 
 
@@ -1145,7 +1113,7 @@ ${convoText}`;
 
     <div style={{ width:"100vw",height:"100dvh",background:"#000",display:"flex",justifyContent:"center",overflow:"hidden" }}>
 
-    <div style={{ width:"min(390px,100vw)",height:"100dvh",overflow:"hidden",position:"relative",background:"#020810",fontFamily:"'Noto Sans KR',sans-serif",flexShrink:0,transform:`translateY(-${kbShift}px)`,transition:"transform .15s ease-out" }}>
+    <div style={{ width:"min(390px,100vw)",height:"100dvh",overflow:"hidden",position:"relative",background:"#020810",fontFamily:"'Noto Sans KR',sans-serif",flexShrink:0 }}>
 
       <style>{`
 
@@ -1394,18 +1362,20 @@ ${convoText}`;
 
 
       {/* ── 입력창 ── */}
+      {/* 래퍼: 가운데 고정 (transform 충돌 방지) */}
+      <div style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:100, display:"flex", justifyContent:"center", pointerEvents:"none" }}>
 
-      <div style={{
+      <div id="chat-input-area" style={{
 
-        position:"absolute", bottom:kbShift, left:0, right:0,
+        width:"min(390px,100vw)",
 
         padding:"10px 14px 18px",
 
         background:"linear-gradient(0deg,rgba(2,5,12,.98) 70%,transparent)",
 
-        transition:"bottom .15s ease-out",
+        transition:"transform 0.1s ease-out",
 
-        zIndex:50,
+        pointerEvents:"all",
 
       }}
 
@@ -1446,6 +1416,7 @@ ${convoText}`;
         </div>
 
       </div>
+      </div>{/* 래퍼 닫기 */}
 
 
 
