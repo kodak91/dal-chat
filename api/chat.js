@@ -20,15 +20,15 @@ function dateKey() {
   return new Date().toISOString().slice(0, 10); // "2026-04-14"
 }
 
-async function getCount(date, ipHash) {
-  const url = `${process.env.FIREBASE_DB_URL}/ipLimits/${date}/${ipHash}.json?auth=${process.env.FIREBASE_DB_SECRET}`;
+async function getCount(uid, date) {
+  const url = `${process.env.FIREBASE_DB_URL}/users/${uid}/${date}.json?auth=${process.env.FIREBASE_DB_SECRET}`;
   const r = await fetch(url);
   const d = await r.json();
   return d?.count ?? 0;
 }
 
-async function setCount(date, ipHash, count) {
-  const url = `${process.env.FIREBASE_DB_URL}/ipLimits/${date}/${ipHash}.json?auth=${process.env.FIREBASE_DB_SECRET}`;
+async function setCount(uid, date, count) {
+  const url = `${process.env.FIREBASE_DB_URL}/users/${uid}/${date}.json?auth=${process.env.FIREBASE_DB_SECRET}`;
   await fetch(url, {
     method:  'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -46,15 +46,16 @@ module.exports = async function handler(req, res) {
     return res.end('Method Not Allowed');
   }
 
-  const ip =
+  // uid: 클라이언트 익명 인증, 없으면 IP 해시로 폴백
+  const uid = req.headers['x-user-id'] || hashIP(
     ((req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) ||
     req.socket?.remoteAddress ||
-    'unknown';
-  const ipHash = hashIP(ip);
-  const date   = dateKey();
+    'unknown'
+  );
+  const date = dateKey();
 
   let count = 0;
-  try { count = await getCount(date, ipHash); } catch (e) { console.error('Firebase read error:', e); }
+  try { count = await getCount(uid, date); } catch (e) { console.error('Firebase read error:', e); }
 
   // 50회 초과 — 종료
   if (count >= LOCK_AT) {
@@ -69,7 +70,7 @@ module.exports = async function handler(req, res) {
     return res.end();
   }
 
-  try { await setCount(date, ipHash, count + 1); } catch (e) { console.error('Firebase write error:', e); }
+  try { await setCount(uid, date, count + 1); } catch (e) { console.error('Firebase write error:', e); }
 
   // 모델 고정 + 40회 이상 졸림 노트 추가
   const body = { ...req.body, model: MODEL };

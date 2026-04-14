@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import emailjs from '@emailjs/browser'
 import ReactGA from 'react-ga4'
-import DalChat from './DalChat.jsx'
+import App from './App.jsx'
 
 emailjs.init({ publicKey: "CzDpYaGEzYS0WVSfo" })
 
@@ -13,4 +13,4 @@ window.addEventListener('appinstalled', () => {
   ReactGA.event({ category: 'PWA', action: 'installed' })
 })
 
-ReactDOM.createRoot(document.getElementById('root')).render(<DalChat />)
+ReactDOM.createRoot(document.getElementById('root')).render(<App />)

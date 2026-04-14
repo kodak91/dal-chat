@@ -598,17 +598,6 @@ export default function DalChat() {
     localStorage.setItem(SESSION_DAILY, JSON.stringify({ data: dailyMem, savedAt: Date.now() }));
   }, [dailyMem]);
 
-  // 전체화면: 첫 제스처 시 즉시 요청
-  useEffect(() => {
-    const req = () => {
-      document.removeEventListener("touchstart", req);
-      document.removeEventListener("click", req);
-      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(()=>{});
-    };
-    document.addEventListener("touchstart", req, { passive: true });
-    document.addEventListener("click", req);
-    return () => { document.removeEventListener("touchstart", req); document.removeEventListener("click", req); };
-  }, []);
 
   // 스크롤 차단 (height는 건드리지 않음 — 안드로이드 뷰포트 리사이즈 방해 금지)
   useEffect(() => {
