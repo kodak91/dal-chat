@@ -1142,7 +1142,23 @@ ${convoText}`;
       {/* ── 낮 모드 오버레이 ── */}
 
       {isDayMode && (
-        <img src={IMG_DAY} alt="" style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top",zIndex:200,userSelect:"none",pointerEvents:"none" }} />
+        <>
+          <img src={IMG_DAY} alt="" style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top",zIndex:200,userSelect:"none",pointerEvents:"none" }} />
+          <div style={{ position:"absolute",inset:0,zIndex:201,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",paddingBottom:"72px",fontFamily:"'Noto Sans KR',sans-serif" }}>
+            <p style={{ margin:"0 0 16px",textAlign:"center",color:"rgba(255,255,255,.72)",fontSize:13,lineHeight:1.85,textShadow:"0 1px 6px rgba(0,0,0,.5)" }}>
+              지금은 달이 안보이네..<br />밤에 다시 올게.
+            </p>
+            <button
+              onClick={handleDayReset}
+              style={{ background:"rgba(0,0,0,.28)",border:"1px solid rgba(255,255,255,.22)",color:"rgba(255,255,255,.65)",fontSize:12,padding:"8px 22px",cursor:"pointer",fontFamily:"inherit",backdropFilter:"blur(4px)" }}
+            >
+              나중에 다시 올게 🌙
+            </button>
+            {dayResetMsg && (
+              <p style={{ margin:"12px 0 0",color:"rgba(255,210,100,.85)",fontSize:12,textShadow:"0 1px 4px rgba(0,0,0,.6)" }}>{dayResetMsg}</p>
+            )}
+          </div>
+        </>
       )}
 
 

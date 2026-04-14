@@ -4,7 +4,7 @@ import emailjs from '@emailjs/browser'
 import ReactGA from 'react-ga4'
 import DalChat from './DalChat.jsx'
 
-emailjs.init("CzDpYaGEzYS0WVSfo")
+emailjs.init({ publicKey: "CzDpYaGEzYS0WVSfo" })
 
 ReactGA.initialize('G-73QMC4SSQW')
 ReactGA.send({ hitType: 'pageview', page: '/' })
