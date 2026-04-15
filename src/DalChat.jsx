@@ -275,7 +275,7 @@ function HistoryPanel({ messages, streamingText, longMem, shortMem, onClose, onM
               <a href="https://www.wadiz.kr/web/wcomingsoon/rwd/393687" target="_blank" rel="noreferrer" style={{ color:"#8060c0",fontSize:12,textDecoration:"none" }}>→ 와디즈에서 보기</a>
             </div>
             <a href="https://www.wadiz.kr/web/wcomingsoon/rwd/393687" target="_blank" rel="noreferrer" style={{ display:"block",marginTop:8 }}>
-              <img src="/scoop_ad.png" alt="" style={{ width:"100%",borderRadius:8,display:"block" }} />
+              <img src="/scoop_ad2.png" alt="" style={{ width:"100%",borderRadius:8,display:"block" }} />
             </a>
           </div>
         </div>
