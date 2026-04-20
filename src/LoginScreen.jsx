@@ -27,8 +27,14 @@ export default function LoginScreen({ onSuccess }) {
     try {
       const uid = await loginWithGoogle();
       onSuccess(uid);
-    } catch {
-      setError('다시 시도해줘.');
+    } catch (e) {
+      if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+        // 사용자가 팝업 닫은 경우 — 에러 표시 안 함
+      } else if (e.code === 'auth/unauthorized-domain') {
+        setError('이 도메인이 Firebase에 등록되지 않았어. 콘솔 확인 필요.');
+      } else {
+        setError(e.message || '다시 시도해줘.');
+      }
     } finally {
       setLoading(false);
     }

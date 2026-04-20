@@ -1470,7 +1470,7 @@ ${convoText}`;
 
       }}
 
-        onMouseDown={e => { if (e.target.tagName!=="TEXTAREA"&&e.target.tagName!=="BUTTON") e.preventDefault(); }}
+        onMouseDown={e => { if (!e.target.isContentEditable&&e.target.tagName!=="BUTTON") e.preventDefault(); }}
 
       >
 
