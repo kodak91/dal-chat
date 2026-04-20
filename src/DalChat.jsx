@@ -1053,7 +1053,7 @@ ${convoText}`;
 
       setStreamText("");
 
-      setMessages(finalHistory);
+      startTypewriter(full, () => setMessages(finalHistory));
 
       // 메모리 추출: 1번째 또는 4회마다 (백그라운드)
       const userCount = finalHistory.filter(m => m.role === "user").length;
