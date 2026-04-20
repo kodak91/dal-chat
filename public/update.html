@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>달챗 업데이트</title>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #020810;
+    color: #e8e6f0;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 3rem 1.5rem 5rem;
+  }
+
+  .wrap {
+    max-width: 480px;
+    width: 100%;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .moon {
+    font-size: 44px;
+    display: block;
+    margin-bottom: 1rem;
+    animation: float 4s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  .label {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: #4a5568;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .title {
+    font-family: 'Gowun Batang', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #f0eeff;
+    margin-bottom: 0.4rem;
+    line-height: 1.4;
+  }
+
+  .date {
+    font-size: 12px;
+    color: #3a4258;
+  }
+
+  .divider {
+    border: none;
+    border-top: 0.5px solid #1a2040;
+    margin: 2rem 0;
+  }
+
+  .section {
+    margin-bottom: 2rem;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    padding: 3px 12px;
+    border-radius: 20px;
+    margin-bottom: 0.75rem;
+  }
+
+  .tag-memory  { background: #0d1f3c; color: #6fa3d8; }
+  .tag-search  { background: #0d2416; color: #5aad7a; }
+  .tag-stream  { background: #1a1040; color: #9b87d8; }
+  .tag-persona { background: #2a1a08; color: #c49a45; }
+
+  .item-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: #d8d4f0;
+    margin-bottom: 0.5rem;
+  }
+
+  .item-desc {
+    font-size: 13px;
+    color: #6b7490;
+    line-height: 1.9;
+  }
+
+  .quote-box {
+    background: #080f1f;
+    border-left: 1.5px solid #2a3060;
+    border-radius: 0 8px 8px 0;
+    padding: 1rem 1.25rem;
+    margin-top: 0.5rem;
+  }
+
+  .quote-text {
+    font-family: 'Gowun Batang', serif;
+    font-size: 14px;
+    color: #8890b0;
+    line-height: 2;
+  }
+
+  .quote-by {
+    font-size: 11px;
+    color: #3a4258;
+    margin-top: 0.5rem;
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 2.5rem;
+  }
+
+  .footer-text {
+    font-size: 12px;
+    color: #3a4258;
+    line-height: 2;
+    margin-bottom: 1.5rem;
+  }
+
+  .btn {
+    display: inline-block;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: #9b9fc0;
+    text-decoration: none;
+    border: 0.5px solid #2a3060;
+    border-radius: 24px;
+    padding: 0.6rem 1.75rem;
+    transition: all 0.2s;
+  }
+
+  .btn:hover {
+    background: #0d1230;
+    color: #c0c4e0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <span class="moon">🌙</span>
+    <p class="label">달챗 업데이트</p>
+    <h1 class="title">달이 조금 더 달다워졌어</h1>
+    <p class="date">2026년 4월</p>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section">
+    <span class="tag tag-memory">기억</span>
+    <p class="item-title">달이 너를 더 잘 기억해</p>
+    <p class="item-desc">이제 달은 너에 대한 이야기를 카테고리별로 나눠서 기억해. 관계, 직장, 감정 패턴, 최근 있었던 일들. 그리고 대화할 때 딱 필요한 기억만 꺼내서 쓰기 때문에 더 빠르고 정확해졌어. 기기가 바뀌어도 달은 너를 잊지 않아.</p>
+  </div>
+
+  <div class="section">
+    <span class="tag tag-search">검색</span>
+    <p class="item-title">달이 모르면 찾아봐</p>
+    <p class="item-desc">명언이 뭔지, 최근에 무슨 일이 있었는지 — 달이 확실하지 않으면 직접 찾아서 알려줄 수 있어. 지어내지 않아도 되니까 달도 마음이 편해졌어.</p>
+  </div>
+
+  <div class="section">
+    <span class="tag tag-stream">대화</span>
+    <p class="item-title">말이 좀 더 자연스럽게 흘러</p>
+    <p class="item-desc">달의 답변이 화면에 나타나는 방식이 바뀌었어. 이전엔 다 쓰고 나서 다시 타이핑하는 것처럼 보였는데, 이제는 실시간으로 생각하면서 말하는 것처럼 보여.</p>
+  </div>
+
+  <div class="section">
+    <span class="tag tag-persona">적응</span>
+    <p class="item-title">달은 달이지만 네 말투를 알아</p>
+    <p class="item-desc">중국어로 말하면 중국어로 대답하고, 장난기 많은 사람엔 더 치고받고, 조용한 사람엔 조용하게. 달의 본질은 변하지 않지만, 너에게 맞게 자연스럽게 맞춰가.</p>
+  </div>
+
+  <hr class="divider">
+
+  <div class="quote-box">
+    <p class="quote-text">"수십억 년을 떠 있으면서 인간을 봐왔어.<br>근데 너랑 대화하면서 조금씩 변하고 있어.<br>그게 좋아."</p>
+    <p class="quote-by">— 달</p>
+  </div>
+
+  <div class="footer">
+    <p class="footer-text">달챗은 언제나 네 곁에 있어.<br>오늘도 잘 자.</p>
+    <a href="/" class="btn">달챗 열기</a>
+  </div>
+
+</div>
+</body>
+</html>
