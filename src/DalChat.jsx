@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import dalPersonality from "./prompts/dal-personality.txt?raw";
 import FeedbackModal from "./FeedbackModal.jsx";
 import ReactGA from "react-ga4";
+import { ensureAnonymousAuth, loadMemory, saveMemoryCategory } from "./firebase.js";
 
 
 
@@ -26,13 +27,30 @@ const DAY_END_H   = 17;
 const SLEEP_AT    = 50;
 const LOCK_AT     = 60;
 
-const LONG_KEY     = "dal:memory:long";
-const SHORT_KEY    = "dal:memory:short";
-const ONBOARD_KEY  = "dal:onboarding";
-const SESSION_MSGS = "dal:session:messages";  // 세션 메시지 (오후5시~오전5시)
-const SESSION_COMP = "dal:session:compress";  // 압축 인덱스
-const SESSION_DAILY= "dal:session:daily";     // 일일 압축 기억
+const ONBOARD_KEY    = "dal:onboarding";
+const SESSION_MSGS   = "dal:session:messages";
+const SESSION_COMP   = "dal:session:compress";
+const SESSION_DAILY  = "dal:session:daily";
 const DEV_UNLOCK_KEY = "dal:dev:unlocked";
+
+const BASE_CATEGORIES = ['fixed', 'facts', 'prefs', 'recent'];
+
+const CATEGORY_KEYWORDS = {
+  relation: ['여자친구', '남자친구', '연인', '결혼', '데이트',
+             '가족', '엄마', '아빠', '형', '언니', '동생', '친구'],
+  work:     ['직장', '회사', '팀장', '상사', '업무', '출근',
+             '퇴근', '동료', '취업', '이직', '면접'],
+  mental:   ['우울', '불안', '힘들', '외로', '스트레스',
+             '무기력', '화나', '슬프', '지쳐'],
+};
+
+function detectCategories(messages) {
+  const text = messages.map(m => m.content || '').join(' ');
+  const extra = Object.entries(CATEGORY_KEYWORDS)
+    .filter(([, kws]) => kws.some(kw => text.includes(kw)))
+    .map(([cat]) => cat);
+  return [...new Set([...BASE_CATEGORIES, ...extra])];
+}
 
 // 현재 유효한 세션의 시작 timestamp 반환. 낮(오전5시~오후5시)이면 null.
 function getSessionStart() {
@@ -46,8 +64,15 @@ function getSessionStart() {
   return null; // 낮 시간
 }
 
-const defaultLong = () => ({ name: null, age: null, purpose: null, facts: [], prefs: [], lastUpdated: null });
-const defaultShort = () => [];
+const defaultMemory = () => ({
+  fixed:    { name: null, age: null, purpose: null },
+  facts:    { items: [] },
+  prefs:    { items: [] },
+  relation: { items: [] },
+  work:     { items: [] },
+  mental:   { items: [] },
+  recent:   { items: [] },
+});
 const defaultOnboard = () => ({ totalMessages: 0 });
 
 function pruneShort(arr) {
@@ -59,29 +84,29 @@ function pruneShort(arr) {
 
 // ── 시스템 프롬프트 ────────────────────────────────────
 
-const buildSystemPrompt = (longMem, shortMem, onboarding, dailyMem = [], initTime = null) => {
+const buildSystemPrompt = (memoryData, onboarding, dailyMem = [], initTime = null) => {
   const now = Date.now();
-  const hour = new Date().getHours();
   const timeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-  const timeContext = `[현재 시각: ${timeStr}]`;
-  let memSection = `\n\n${timeContext}`;
+  let memSection = `\n\n[현재 시각: ${timeStr}]`;
 
   if (initTime) memSection += `\n\n[대화 시작 시간]: ${initTime}`;
 
-  // 장기 기억
+  // fixed + facts → [이 사람에 대해 알고 있는 것]
+  const fixed = memoryData.fixed || {};
   const longParts = [];
-  if (longMem.name)    longParts.push(`이름: ${longMem.name}`);
-  if (longMem.age)     longParts.push(`나이: ${longMem.age}`);
-  if (longMem.purpose) longParts.push(`달 찾는 이유: ${longMem.purpose}`);
-  if (longMem.facts?.length) longParts.push(`기타: ${longMem.facts.join(', ')}`);
+  if (fixed.name)    longParts.push(`이름: ${fixed.name}`);
+  if (fixed.age)     longParts.push(`나이: ${fixed.age}`);
+  if (fixed.purpose) longParts.push(`달 찾는 이유: ${fixed.purpose}`);
+  const facts = memoryData.facts?.items || [];
+  if (facts.length)  longParts.push(`기타: ${facts.join(', ')}`);
   if (longParts.length) {
     memSection += `\n\n[이 사람에 대해 알고 있는 것]\n${longParts.join('\n')}`;
   }
 
-  // 단기 기억 (최근 사건)
-  const recent = pruneShort(shortMem).slice(-6);
-  if (recent.length) {
-    const lines = recent.map(e => {
+  // recent → [최근에 있었던 일]
+  const recentItems = pruneShort(memoryData.recent?.items || []).slice(-6);
+  if (recentItems.length) {
+    const lines = recentItems.map(e => {
       const daysAgo = Math.floor((now - e.createdAt) / 86400000);
       const when = daysAgo === 0 ? '오늘' : daysAgo === 1 ? '어제' : `${daysAgo}일 전`;
       return `- ${when}: ${e.content}`;
@@ -94,16 +119,25 @@ const buildSystemPrompt = (longMem, shortMem, onboarding, dailyMem = [], initTim
     memSection += `\n\n[오늘 이전 대화 요약]\n${dailyMem.map(d => d.summary).join('\n---\n')}`;
   }
 
-  // 사용자 말투/성격 요청
-  if (longMem.prefs?.length) {
-    memSection += `\n\n[사용자 말투/성격 요청 — 참고만, 기본 성격 침해 금지]: ${longMem.prefs.join(', ')}`;
+  // prefs
+  const prefs = memoryData.prefs?.items || [];
+  if (prefs.length) {
+    memSection += `\n\n[사용자 말투/성격 요청 — 참고만, 기본 성격 침해 금지]: ${prefs.join(', ')}`;
   }
 
-  // 온보딩: 모르는 것 자연스럽게 하나씩 질문
+  // 동적 카테고리 — 로드된 것만 추가
+  const relation = memoryData.relation?.items || [];
+  const work     = memoryData.work?.items || [];
+  const mental   = memoryData.mental?.items || [];
+  if (relation.length) memSection += `\n\n[관계]: ${relation.join(', ')}`;
+  if (work.length)     memSection += `\n\n[직장/일]: ${work.join(', ')}`;
+  if (mental.length)   memSection += `\n\n[감정/심리 패턴]: ${mental.join(', ')}`;
+
+  // 온보딩
   const total = onboarding?.totalMessages || 0;
   const missing = [];
-  if (!longMem.name)    missing.push('이름');
-  if (!longMem.purpose) missing.push('달한테 주로 뭘 털어놓으러 오는지(하소연인지, 심심해서인지, 화풀이인지 등)');
+  if (!fixed.name)    missing.push('이름');
+  if (!fixed.purpose) missing.push('달한테 주로 뭘 털어놓으러 오는지(하소연인지, 심심해서인지, 화풀이인지 등)');
   if (missing.length && total <= 30) {
     memSection += `\n\n[참고]: 아직 모르는 것이 있어 — "${missing[0]}". 대화 흐름상 자연스러울 때 슬쩍 한 번만 물어봐. 억지로 물어볼 필요는 없어.`;
   }
@@ -184,7 +218,7 @@ function MoonFace({ isThinking, isSpeaking, size }) {
 
 // ── 히스토리 패널 ──────────────────────────────────────
 
-function HistoryPanel({ messages, streamingText, longMem, shortMem, onClose, onMakeDiary, diaryLoading, onOpenDiaries }) {
+function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiary, diaryLoading, onOpenDiaries }) {
 
   const endRef = useRef(null);
 
@@ -192,17 +226,16 @@ function HistoryPanel({ messages, streamingText, longMem, shortMem, onClose, onM
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, streamingText]);
 
-  // 장기 기억 표시용 텍스트
+  const fixed = memoryData.fixed || {};
   const longLines = [
-    longMem.name    ? `이름: ${longMem.name}` : null,
-    longMem.age     ? `나이: ${longMem.age}` : null,
-    longMem.purpose ? `목적: ${longMem.purpose}` : null,
-    ...(longMem.facts || []).map(f => `• ${f}`),
+    fixed.name    ? `이름: ${fixed.name}` : null,
+    fixed.age     ? `나이: ${fixed.age}` : null,
+    fixed.purpose ? `목적: ${fixed.purpose}` : null,
+    ...(memoryData.facts?.items || []).map(f => `• ${f}`),
   ].filter(Boolean);
 
-  // 단기 기억 표시용 텍스트
   const now = Date.now();
-  const recentLines = pruneShort(shortMem).slice(-4).map(e => {
+  const recentLines = pruneShort(memoryData.recent?.items || []).slice(-4).map(e => {
     const daysAgo = Math.floor((now - e.createdAt) / 86400000);
     const when = daysAgo === 0 ? '오늘' : daysAgo === 1 ? '어제' : `${daysAgo}일 전`;
     return `${when}: ${e.content}`;
@@ -422,9 +455,7 @@ export default function DalChat() {
 
   const [diaries, setDiaries]          = useState([]);
 
-  const [longMem, setLongMem]          = useState(defaultLong());
-
-  const [shortMem, setShortMem]        = useState(defaultShort());
+  const [memoryData, setMemoryData]    = useState(defaultMemory());
 
   const [onboarding, setOnboarding]    = useState(defaultOnboard());
 
@@ -453,9 +484,11 @@ export default function DalChat() {
 
   const taRef                          = useRef(null);
 
-  const longMemRef                     = useRef(defaultLong());
+  const memoryDataRef                  = useRef(defaultMemory());
 
-  const shortMemRef                    = useRef(defaultShort());
+  const uidRef                         = useRef(null);
+
+  const loadedCatsRef                  = useRef(new Set(BASE_CATEGORIES));
 
   const onboardingRef                  = useRef(defaultOnboard());
 
@@ -476,15 +509,17 @@ export default function DalChat() {
 
   useEffect(() => {
 
-    try {
-      const r = localStorage.getItem(LONG_KEY);
-      if (r) { const p = JSON.parse(r); setLongMem(p); longMemRef.current = p; }
-    } catch {}
-
-    try {
-      const r = localStorage.getItem(SHORT_KEY);
-      if (r) { const arr = pruneShort(JSON.parse(r)); setShortMem(arr); shortMemRef.current = arr; }
-    } catch {}
+    // Firebase uid + 기본 카테고리 메모리 로드
+    ensureAnonymousAuth().then(async (uid) => {
+      if (!uid) return;
+      uidRef.current = uid;
+      try {
+        const mem = await loadMemory(uid, BASE_CATEGORIES);
+        const merged = { ...defaultMemory(), ...mem };
+        memoryDataRef.current = merged;
+        setMemoryData(merged);
+      } catch {}
+    });
 
     // 세션 데이터 복원 (오후5시~오전5시 범위 내면 유지)
     const sessionStart = getSessionStart();
@@ -703,6 +738,9 @@ export default function DalChat() {
 
   const extractAndSaveMemories = useCallback(async (finalHistory) => {
 
+    const uid = uidRef.current;
+    if (!uid) return;
+
     const convoText = finalHistory.slice(-12)
       .map(m => (m.role === "user" ? "사용자" : "달") + ": " + m.content)
       .join("\n");
@@ -710,14 +748,13 @@ export default function DalChat() {
     const prompt = `다음 대화를 분석해서 JSON만 반환해. 다른 말은 하지 마.
 
 {
-  "shortEvents": ["방금 대화에서 나온 사용자의 최근 사건/감정/상황 (최대 3개, 없으면 빈 배열)"],
-  "longFacts": {
-    "name": "사용자 이름 (확실할 때만, 아니면 null)",
-    "age": "나이 숫자 (확실할 때만, 아니면 null)",
-    "purpose": "달 찾는 주 목적 — 하소연/장난/화풀이/대화 중 하나로, 불명확하면 null",
-    "newFacts": ["새롭게 알게 된 영구적 사실 (직업·가족·취미 등, 없으면 빈 배열)"]
-  },
-  "prefUpdates": ["사용자가 달에게 원하는 말투/성격 변화 키워드 (예: '말 적게', '영어로', '다정하게'), 없으면 빈 배열"]
+  "fixed": { "name": "이름(확실할 때만, 아니면 null)", "age": "나이(확실할 때만, 아니면 null)", "purpose": "달 찾는 주 목적(하소연/장난/화풀이/대화 중 하나, 불명확하면 null)" },
+  "facts": ["일반 영구 사실(직업·취미 등, 없으면 빈 배열)"],
+  "relation": ["관계 관련 내용(없으면 빈 배열)"],
+  "work": ["직장 관련 내용(없으면 빈 배열)"],
+  "mental": ["감정/심리 패턴(없으면 빈 배열)"],
+  "recent": ["최근 사건/감정/상황(최대 3개, 없으면 빈 배열)"],
+  "prefs": ["달에게 원하는 말투/성격 변화(없으면 빈 배열)"]
 }
 
 대화:
@@ -730,7 +767,7 @@ ${convoText}`;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 300,
+          max_tokens: 400,
           messages: [{ role: "user", content: prompt }]
         })
       });
@@ -740,39 +777,46 @@ ${convoText}`;
       const ext  = JSON.parse(txt);
       const now  = Date.now();
 
-      // 단기 기억 업데이트
-      const newEvents = (ext.shortEvents || [])
-        .filter(e => e && e.trim())
-        .map(content => ({ content: content.trim(), createdAt: now, expiresAt: now + SHORT_TTL }));
+      const current = memoryDataRef.current;
+      const updated = { ...current };
 
-      const updatedShort = pruneShort([...shortMemRef.current, ...newEvents]);
-      shortMemRef.current = updatedShort;
-      setShortMem(updatedShort);
-      localStorage.setItem(SHORT_KEY, JSON.stringify(updatedShort));
-
-      // 장기 기억 업데이트 (기존 값 우선, 새 값으로 덮어쓰지 않음)
-      const lf = ext.longFacts || {};
-      const updatedLong = { ...longMemRef.current };
-      if (lf.name    && !updatedLong.name)    updatedLong.name    = lf.name;
-      if (lf.age     && !updatedLong.age)     updatedLong.age     = lf.age;
-      if (lf.purpose && !updatedLong.purpose) updatedLong.purpose = lf.purpose;
-      if (lf.newFacts?.length) {
-        const existing = new Set(updatedLong.facts || []);
-        lf.newFacts.filter(f => f && !existing.has(f)).forEach(f => existing.add(f));
-        updatedLong.facts = [...existing].slice(-15);
-      }
-      updatedLong.lastUpdated = now;
-
-      // 사용자 말투/성격 요청 업데이트
-      if (ext.prefUpdates?.length) {
-        const ep = new Set(updatedLong.prefs||[]);
-        ext.prefUpdates.filter(p=>p&&p.trim()).forEach(p=>ep.add(p.trim()));
-        updatedLong.prefs = [...ep].slice(-10);
+      // fixed: 기존 값 우선 (덮어쓰지 않음)
+      if (ext.fixed) {
+        const f = ext.fixed;
+        const cf = current.fixed || {};
+        updated.fixed = { ...cf };
+        if (f.name    && !cf.name)    updated.fixed.name    = f.name;
+        if (f.age     && !cf.age)     updated.fixed.age     = f.age;
+        if (f.purpose && !cf.purpose) updated.fixed.purpose = f.purpose;
+        await saveMemoryCategory(uid, 'fixed', updated.fixed);
       }
 
-      longMemRef.current = updatedLong;
-      setLongMem(updatedLong);
-      localStorage.setItem(LONG_KEY, JSON.stringify(updatedLong));
+      // 카테고리별 누적 저장 헬퍼
+      const mergeItems = async (cat, newItems, limit) => {
+        if (!newItems?.length) return;
+        const existing = new Set(current[cat]?.items || []);
+        newItems.filter(v => v && v.trim && !existing.has(v)).forEach(v => existing.add(v));
+        updated[cat] = { items: [...existing].slice(-limit) };
+        await saveMemoryCategory(uid, cat, updated[cat]);
+      };
+
+      await mergeItems('facts',    ext.facts,    15);
+      await mergeItems('relation', ext.relation, 20);
+      await mergeItems('work',     ext.work,     20);
+      await mergeItems('mental',   ext.mental,   20);
+      await mergeItems('prefs',    ext.prefs,    10);
+
+      // recent: 만료 처리 포함
+      if (ext.recent?.length) {
+        const newItems = ext.recent
+          .filter(e => e && e.trim())
+          .map(content => ({ content: content.trim(), createdAt: now, expiresAt: now + SHORT_TTL }));
+        updated.recent = { items: pruneShort([...(current.recent?.items || []), ...newItems]) };
+        await saveMemoryCategory(uid, 'recent', updated.recent);
+      }
+
+      memoryDataRef.current = updated;
+      setMemoryData(updated);
 
     } catch { /* 실패 시 조용히 무시 */ }
 
@@ -883,6 +927,20 @@ ${convoText}`;
       return;
     }
 
+    // 키워드 감지 → 새 카테고리 있으면 추가 로드
+    const detectedCats = detectCategories(history);
+    const newCats = detectedCats.filter(c => !loadedCatsRef.current.has(c));
+    if (newCats.length && uidRef.current) {
+      try {
+        const extra = await loadMemory(uidRef.current, newCats);
+        newCats.forEach(c => loadedCatsRef.current.add(c));
+        const merged = { ...memoryDataRef.current };
+        newCats.forEach(c => { if (extra[c]) merged[c] = extra[c]; });
+        memoryDataRef.current = merged;
+        setMemoryData(merged);
+      } catch {}
+    }
+
     setIsStreaming(true);
 
     let full = "";
@@ -901,7 +959,7 @@ ${convoText}`;
 
           max_tokens: 300,
 
-          system: buildSystemPrompt(longMemRef.current, shortMemRef.current, onboardingRef.current, dailyMemRef.current, initTimeRef.current),
+          system: buildSystemPrompt(memoryDataRef.current, onboardingRef.current, dailyMemRef.current, initTimeRef.current),
 
           stream: true,
 
@@ -1429,7 +1487,7 @@ ${convoText}`;
 
 
 
-      {showHistory && <HistoryPanel messages={messages} streamingText={streamingText} longMem={longMem} shortMem={shortMem} onClose={()=>setShowHistory(false)} onMakeDiary={makeDiary} diaryLoading={diaryLoading} onOpenDiaries={()=>{setShowDiaries(true);setShowHistory(false);}} />}
+      {showHistory && <HistoryPanel messages={messages} streamingText={streamingText} memoryData={memoryData} onClose={()=>setShowHistory(false)} onMakeDiary={makeDiary} diaryLoading={diaryLoading} onOpenDiaries={()=>{setShowDiaries(true);setShowHistory(false);}} />}
 
       {showDiaries && <DiaryModal diaries={diaries} onClose={()=>setShowDiaries(false)} />}
 
