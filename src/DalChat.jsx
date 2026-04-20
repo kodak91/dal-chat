@@ -966,6 +966,7 @@ ${convoText}`;
     }
 
     setIsStreaming(true);
+    setMoonBubble("");
 
     let full = "";
 
@@ -1038,6 +1039,7 @@ ${convoText}`;
               full += parsed.delta.text;
 
               setStreamText(full);
+              setMoonBubble(full);
 
             }
 
@@ -1053,7 +1055,7 @@ ${convoText}`;
 
       setStreamText("");
 
-      startTypewriter(full, () => setMessages(finalHistory));
+      setMessages(finalHistory);
 
       // 메모리 추출: 1번째 또는 4회마다 (백그라운드)
       const userCount = finalHistory.filter(m => m.role === "user").length;
@@ -1078,8 +1080,7 @@ ${convoText}`;
       console.error("Stream error:", e);
 
       setStreamText("");
-
-      startTypewriter("미안, 구름이 좀 끼었어. 다시 말해줄래?");
+      setMoonBubble("미안, 구름이 좀 끼었어. 다시 말해줄래?");
 
     } finally {
 
