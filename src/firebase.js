@@ -9,16 +9,21 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { getDatabase, ref, get, set } from 'firebase/database';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const app = initializeApp({
-  apiKey:      import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain:  import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId:   import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  databaseURL:       import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 });
 
 export const auth = getAuth(app);
 const db = getDatabase(app);
+
+// ── Auth ──────────────────────────────────────────────
 
 export async function loginWithGoogle() {
   const provider = new GoogleAuthProvider();
@@ -59,6 +64,37 @@ export async function getCurrentUser() {
 export async function logoutUser() {
   await signOut(auth);
 }
+
+// ── Push 알림 ─────────────────────────────────────────
+
+export async function requestAndSavePushToken(uid) {
+  if (!('Notification' in window)) return;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    const messaging = getMessaging(app);
+    const token = await getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js'),
+    });
+    if (!token) return;
+
+    await set(ref(db, `users/${uid}/pushToken`), token);
+
+    // 포그라운드 메시지 핸들러 (앱이 열려있을 때)
+    onMessage(messaging, (payload) => {
+      new Notification(payload.notification?.title ?? '달챗', {
+        body: payload.notification?.body ?? '',
+        icon: '/icon-192.png',
+      });
+    });
+  } catch {
+    // 권한 거부 또는 실패 시 조용히 무시
+  }
+}
+
+// ── DB 헬퍼 ───────────────────────────────────────────
 
 function defaultCategoryData(cat) {
   if (cat === 'fixed') return { name: null, age: null, purpose: null };

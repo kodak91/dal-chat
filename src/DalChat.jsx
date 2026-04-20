@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import dalPersonality from "./prompts/dal-personality.txt?raw";
 import FeedbackModal from "./FeedbackModal.jsx";
 import ReactGA from "react-ga4";
-import { loadMemory, saveMemoryCategory } from "./firebase.js";
+import { loadMemory, saveMemoryCategory, requestAndSavePushToken } from "./firebase.js";
 
 
 
@@ -513,7 +513,7 @@ export default function DalChat({ uid }) {
 
   useEffect(() => {
 
-    // props.uid로 Firebase 메모리 로드
+    // props.uid로 Firebase 메모리 로드 + 푸시 토큰 등록
     if (uid) {
       uidRef.current = uid;
       loadMemory(uid, BASE_CATEGORIES).then((mem) => {
@@ -521,6 +521,10 @@ export default function DalChat({ uid }) {
         memoryDataRef.current = merged;
         setMemoryData(merged);
       }).catch(() => {});
+
+      // 3초 후 알림 허용 요청 (첫 방문 느낌 줄이기 위한 딜레이)
+      const pushTimer = setTimeout(() => requestAndSavePushToken(uid), 3000);
+      return () => clearTimeout(pushTimer);
     }
 
     // 세션 데이터 복원 (오후5시~오전5시 범위 내면 유지)
