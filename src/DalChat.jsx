@@ -1033,7 +1033,7 @@ ${convoText}`;
 
             if (parsed.type === "message_stop") break outer;
 
-            if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
+            if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta" && typeof parsed.delta.text === "string") {
 
               full += parsed.delta.text;
 
