@@ -16,6 +16,7 @@ export default function FeedbackModal({ onClose }) {
       await emailjs.send(SERVICE_ID, TEMPLATE_ID, {
         message: text.trim(),
         time: new Date().toLocaleString("ko-KR"),
+        to_email: "labangba.pd@gmail.com",
       });
       ReactGA.event({ category: "Feedback", action: "submitted" });
       setStatus("done");
