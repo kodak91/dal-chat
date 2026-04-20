@@ -120,10 +120,14 @@ const buildSystemPrompt = (memoryData, onboarding, dailyMem = [], initTime = nul
   }
 
   // prefs
-  const prefs = memoryData.prefs?.items || [];
+  const prefsData = memoryData.prefs || {};
+  const prefs = prefsData.items || [];
   if (prefs.length) {
     memSection += `\n\n[사용자 말투/성격 요청 — 참고만, 기본 성격 침해 금지]: ${prefs.join(', ')}`;
   }
+  if (prefsData.lang)           memSection += `\n[선호언어]: ${prefsData.lang}`;
+  if (prefsData.tone)           memSection += `\n[선호톤]: ${prefsData.tone}`;
+  if (prefsData.profanity != null) memSection += `\n[욕설허용]: ${prefsData.profanity}`;
 
   // 동적 카테고리 — 로드된 것만 추가
   const relation = memoryData.relation?.items || [];
@@ -752,7 +756,12 @@ export default function DalChat({ uid }) {
   "work": ["직장 관련 내용(없으면 빈 배열)"],
   "mental": ["감정/심리 패턴(없으면 빈 배열)"],
   "recent": ["최근 사건/감정/상황(최대 3개, 없으면 빈 배열)"],
-  "prefs": ["달에게 원하는 말투/성격 변화(없으면 빈 배열)"]
+  "prefs": {
+    "items": ["달에게 원하는 말투/성격 변화(없으면 빈 배열)"],
+    "lang": "유저가 쓰는 언어 코드 (ko/zh/en 등, 감지되면 반드시 추출, 모르면 null)",
+    "tone": "유저가 선호하는 달의 톤 (cold/warm/playful 중 하나, 감지 안 되면 null)",
+    "profanity": "유저가 욕설을 쓰는지 여부 (true/false, 모르면 null)"
+  }
 }
 
 대화:
@@ -802,7 +811,19 @@ ${convoText}`;
       await mergeItems('relation', ext.relation, 20);
       await mergeItems('work',     ext.work,     20);
       await mergeItems('mental',   ext.mental,   20);
-      await mergeItems('prefs',    ext.prefs,    10);
+
+      // prefs: items 누적 + lang/tone/profanity scalar 필드 (최신값 우선)
+      if (ext.prefs) {
+        const cp = current.prefs || { items: [] };
+        const existing = new Set(cp.items || []);
+        (ext.prefs.items || []).filter(v => v && !existing.has(v)).forEach(v => existing.add(v));
+        const merged = { ...cp, items: [...existing].slice(-10) };
+        if (ext.prefs.lang      != null) merged.lang      = ext.prefs.lang;
+        if (ext.prefs.tone      != null) merged.tone      = ext.prefs.tone;
+        if (ext.prefs.profanity != null) merged.profanity = ext.prefs.profanity;
+        updated.prefs = merged;
+        await saveMemoryCategory(uid, 'prefs', merged);
+      }
 
       // recent: 만료 처리 포함
       if (ext.recent?.length) {
