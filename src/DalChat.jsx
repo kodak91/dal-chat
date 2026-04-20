@@ -840,7 +840,7 @@ ${convoText}`;
       localStorage.setItem(DEV_UNLOCK_KEY, "1");
       setIsDevUnlocked(true);
       setIsLocked(false);
-      setInput("");
+      setInput(""); if (taRef.current) taRef.current.innerText = "";
       startTypewriter("...알았어, 일어날게.");
       return;
     }
@@ -857,7 +857,7 @@ ${convoText}`;
 
     setMessages(history);
 
-    setInput("");
+    setInput(""); if (taRef.current) { taRef.current.innerText = ""; }
 
     ReactGA.event({ category: "Chat", action: "send_message" });
 
@@ -865,7 +865,7 @@ ${convoText}`;
 
     setBubbleKey(k => k+1);
 
-    if (taRef.current) { taRef.current.style.height="44px"; taRef.current.focus(); }
+    if (taRef.current) { taRef.current.focus(); }
 
     if (isContinuing) return;
 
@@ -1066,15 +1066,18 @@ ${convoText}`;
   const onKey   = (e) => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
 
   const onInput = (e) => {
+    setInput(e.currentTarget.innerText);
+  };
 
-    setInput(e.target.value);
-
-    const t = e.target;
-
-    t.style.height = "44px";
-
-    t.style.height = Math.min(t.scrollHeight, 100)+"px";
-
+  const onPaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    sel.deleteFromDocument();
+    sel.getRangeAt(0).insertNode(document.createTextNode(text));
+    sel.collapseToEnd();
+    setInput(taRef.current.innerText);
   };
 
 
@@ -1118,7 +1121,8 @@ ${convoText}`;
 
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
-        textarea{outline:none;}
+        [contenteditable]{outline:none;}
+        [contenteditable][data-placeholder]:empty::before{content:attr(data-placeholder);color:rgba(136,152,180,.45);pointer-events:none;}
 
         ::-webkit-scrollbar{width:3px}
 
@@ -1390,11 +1394,11 @@ ${convoText}`;
 
         <div style={{ display:"flex",alignItems:"center",gap:9,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",padding:"8px 12px",backdropFilter:"blur(4px)" }}>
 
-          <textarea ref={taRef} value={input} onChange={onInput} onKeyDown={onKey} onFocus={() => setTimeout(() => window.scrollTo(0,0), 50)} disabled={isStreaming||isDayMode||(isLocked&&!isDevUnlocked)}
-
-            placeholder="달에게 말 걸어봐..."
-
-            style={{ flex:1,background:"transparent",border:"none",color:"#8898b4",fontSize:14,fontFamily:"'Noto Sans KR',sans-serif",resize:"none",lineHeight:1.55,height:44,maxHeight:100,overflow:"auto",caretColor:"#4878b8" }} />
+          <div ref={taRef} contentEditable={!isStreaming&&!isDayMode&&!(isLocked&&!isDevUnlocked)} suppressContentEditableWarning={true}
+            onInput={onInput} onKeyDown={onKey} onPaste={onPaste}
+            onFocus={() => setTimeout(() => window.scrollTo(0,0), 50)}
+            data-placeholder="달에게 말 걸어봐..."
+            style={{ flex:1,background:"transparent",border:"none",color:"#8898b4",fontSize:14,fontFamily:"'Noto Sans KR',sans-serif",lineHeight:1.55,minHeight:44,maxHeight:100,overflowY:"auto",caretColor:"#4878b8",wordBreak:"break-word",whiteSpace:"pre-wrap",paddingTop:11 }} />
 
           <button onClick={send} disabled={isStreaming||!input.trim()||isDayMode||(isLocked&&!isDevUnlocked)} style={{
 
