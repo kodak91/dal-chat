@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import dalPersonality from "./prompts/dal-personality.txt?raw";
 import FeedbackModal from "./FeedbackModal.jsx";
+import NoticeModal from "./NoticeModal.jsx";
 import ReactGA from "react-ga4";
 import { loadMemory, saveMemoryCategory, requestAndSavePushToken } from "./firebase.js";
 
@@ -1515,6 +1516,8 @@ ${convoText}`;
       {showDiaries && <DiaryModal diaries={diaries} onClose={()=>setShowDiaries(false)} />}
 
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+
+      <NoticeModal />
 
       {/* ── PWA 설치 배너 ── */}
       {showInstall && (
