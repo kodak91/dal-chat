@@ -1382,7 +1382,7 @@ ${convoText}`;
 
         background:"linear-gradient(0deg,rgba(2,5,12,.98) 70%,transparent)",
 
-        transition:"transform 0.1s ease-out",
+        transition:"none",
 
         pointerEvents:"all",
 
