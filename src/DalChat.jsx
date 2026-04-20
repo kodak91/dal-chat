@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import dalPersonality from "./prompts/dal-personality.txt?raw";
 import FeedbackModal from "./FeedbackModal.jsx";
 import ReactGA from "react-ga4";
-import { ensureAnonymousAuth, loadMemory, saveMemoryCategory } from "./firebase.js";
+import { loadMemory, saveMemoryCategory } from "./firebase.js";
 
 
 
@@ -437,7 +437,7 @@ function DiaryModal({ diaries, onClose }) {
 
 // ── 메인 앱 ────────────────────────────────────────────
 
-export default function DalChat() {
+export default function DalChat({ uid }) {
 
   const [messages, setMessages]        = useState([]);
 
@@ -509,17 +509,15 @@ export default function DalChat() {
 
   useEffect(() => {
 
-    // Firebase uid + 기본 카테고리 메모리 로드
-    ensureAnonymousAuth().then(async (uid) => {
-      if (!uid) return;
+    // props.uid로 Firebase 메모리 로드
+    if (uid) {
       uidRef.current = uid;
-      try {
-        const mem = await loadMemory(uid, BASE_CATEGORIES);
+      loadMemory(uid, BASE_CATEGORIES).then((mem) => {
         const merged = { ...defaultMemory(), ...mem };
         memoryDataRef.current = merged;
         setMemoryData(merged);
-      } catch {}
-    });
+      }).catch(() => {});
+    }
 
     // 세션 데이터 복원 (오후5시~오전5시 범위 내면 유지)
     const sessionStart = getSessionStart();
@@ -1029,7 +1027,7 @@ ${convoText}`;
 
       setStreamText("");
 
-      startTypewriter(full, () => setMessages(finalHistory)); // 애니메이션 끝나면 기록에 추가
+      setMessages(finalHistory);
 
       // 메모리 추출: 1번째 또는 4회마다 (백그라운드)
       const userCount = finalHistory.filter(m => m.role === "user").length;

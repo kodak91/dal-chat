@@ -10,9 +10,10 @@ const SENTENCES = [
 const STARTS    = [1000, 3600, 6600, 9800];
 const CHAR_MS   = 85;
 const HOLD_MS   = 1800;
-const LOGO_TIME = 11500;
-const FADE_TIME = 13000;
-const DONE_TIME = 14000;
+const LOGO_TIME    = 11500;
+const NOTICE_TIME  = 12000;
+const FADE_TIME    = 13000;
+const DONE_TIME    = 14000;
 
 export default function SplashScreen({ onDone }) {
   const [imgOpacity,      setImgOpacity]     = useState(0);
@@ -20,6 +21,7 @@ export default function SplashScreen({ onDone }) {
   const [sentenceText,    setSentenceText]   = useState('');
   const [sentenceOpacity, setSentenceOpacity]= useState(1);
   const [logoOpacity,     setLogoOpacity]    = useState(0);
+  const [noticeOpacity,   setNoticeOpacity]  = useState(0);
   const [splashOpacity,   setSplashOpacity]  = useState(1);
   const activeIdxRef = useRef(-1);
 
@@ -58,6 +60,9 @@ export default function SplashScreen({ onDone }) {
 
     // 달챗 로고 페이드인
     at(LOGO_TIME, () => setLogoOpacity(1));
+
+    // 개인정보 안내 문구 페이드인
+    at(NOTICE_TIME, () => setNoticeOpacity(1));
 
     // 전체 페이드아웃
     at(FADE_TIME, () => setSplashOpacity(0));
@@ -130,6 +135,24 @@ export default function SplashScreen({ onDone }) {
         transition:    'opacity 0.6s ease-in',
       }}>
         달챗
+      </p>
+
+      {/* 개인정보 안내 */}
+      <p style={{
+        position:   'absolute',
+        bottom:     36,
+        margin:     0,
+        color:      'rgba(255,255,255,.55)',
+        fontSize:   11,
+        textAlign:  'center',
+        lineHeight: 1.7,
+        fontFamily: "'Noto Sans KR', sans-serif",
+        opacity:    noticeOpacity,
+        transition: 'opacity 0.6s ease-in',
+        padding:    '0 24px',
+      }}>
+        달과의 대화는 서버에 저장되지 않아.<br />
+        기억은 오직 달과 너 사이에만 있어.
       </p>
     </div>
   );
