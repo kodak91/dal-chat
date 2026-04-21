@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import SplashScreen from './SplashScreen.jsx';
 import LoginScreen from './LoginScreen.jsx';
 import DalChat from './DalChat.jsx';
-import { getCurrentUser } from './firebase.js';
+import { getCurrentUser, logoutUser } from './firebase.js';
 
 function patchFetch(uid) {
   const orig = window.fetch;
@@ -22,10 +22,13 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    getCurrentUser().then((user) => {
-      if (user) {
+    getCurrentUser().then(async (user) => {
+      if (user && !user.isAnonymous) {
         patchFetch(user.uid);
         setUid(user.uid);
+      } else if (user && user.isAnonymous) {
+        // 이전 익명 유저 → 로그아웃 처리해서 로그인 화면으로 보냄
+        try { await logoutUser(); } catch {}
       }
       setAuthChecked(true);
     });

@@ -522,10 +522,6 @@ export default function DalChat({ uid }) {
         memoryDataRef.current = merged;
         setMemoryData(merged);
       }).catch(() => {});
-
-      // 3초 후 알림 허용 요청 (첫 방문 느낌 줄이기 위한 딜레이)
-      const pushTimer = setTimeout(() => requestAndSavePushToken(uid), 3000);
-      return () => clearTimeout(pushTimer);
     }
 
     // 세션 데이터 복원 (오후5시~오전5시 범위 내면 유지)
@@ -571,6 +567,10 @@ export default function DalChat({ uid }) {
     initTimeRef.current = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', hour12:false});
 
     taRef.current?.focus();
+
+    // 3초 후 알림 허용 요청 (uid 있을 때만)
+    const pushTimer = uid ? setTimeout(() => requestAndSavePushToken(uid), 3000) : null;
+    return () => { if (pushTimer) clearTimeout(pushTimer); };
 
   }, []);
 
@@ -1039,7 +1039,6 @@ ${convoText}`;
               full += parsed.delta.text;
 
               setStreamText(full);
-              setMoonBubble(full);
 
             }
 
@@ -1056,6 +1055,9 @@ ${convoText}`;
       setStreamText("");
 
       setMessages(finalHistory);
+
+      // 스트리밍 완료 → 단락별 타이핑 애니메이션
+      startTypewriter(full);
 
       // 메모리 추출: 1번째 또는 4회마다 (백그라운드)
       const userCount = finalHistory.filter(m => m.role === "user").length;
