@@ -91,40 +91,14 @@ module.exports = async function handler(req, res) {
     if (body.stream) {
       res.writeHead(200, {
         ...CORS,
-        'Content-Type': 'text/event-stream',
+        'Content-Type': upstream.headers.get('content-type') || 'text/event-stream',
         'Cache-Control': 'no-cache',
       });
       const reader = upstream.body.getReader();
-      const dec = new TextDecoder();
-      let buf = '';
-      let full = '';
-      outer: while (true) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split('\n');
-        buf = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const raw = line.slice(6).trim();
-          if (!raw || raw === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(raw);
-            if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
-              const text = parsed.delta.text;
-              if (typeof text === 'string' && text !== '') {
-                full += text;
-                res.write(`data: ${raw}\n\n`);
-              }
-              // 빈 텍스트 델타는 전송하지 않음
-            } else if (parsed.type === 'message_stop') {
-              // full 비어있어도 종료 이벤트는 항상 전달
-              res.write(`data: ${raw}\n\n`);
-              break outer;
-            }
-            // tool_use 등 기타 이벤트는 클라이언트에서 무시하므로 전달 안 함
-          } catch { /* 파싱 실패 무시 */ }
-        }
+        res.write(value);
       }
     } else {
       const data = await upstream.json();

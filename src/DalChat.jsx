@@ -1048,6 +1048,12 @@ ${convoText}`;
 
       }
 
+      // 빈 응답 방어 (웹서치 후 텍스트 없이 종료된 경우)
+      if (!full.trim()) {
+        setMoonBubble("미안, 잠깐 딴 생각 했어. 다시 말해줄래?");
+        return;
+      }
+
       const finalHistory = [...history, { role:"assistant", content:full }];
 
       historyRef.current = finalHistory; // 즉시 반영 (다음 send API 콜용)
