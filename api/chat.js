@@ -12,6 +12,8 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+const FIREBASE_BASE = (process.env.FIREBASE_DB_URL || '').replace(/\/$/, '');
+
 function hashIP(ip) {
   return crypto.createHash('sha256').update(ip).digest('hex').slice(0, 16);
 }
@@ -21,14 +23,14 @@ function dateKey() {
 }
 
 async function getCount(uid, date) {
-  const url = `${process.env.FIREBASE_DB_URL}/users/${uid}/${date}.json?auth=${process.env.FIREBASE_DB_SECRET}`;
+  const url = `${FIREBASE_BASE}/users/${uid}/${date}.json?auth=${process.env.FIREBASE_DB_SECRET}`;
   const r = await fetch(url);
   const d = await r.json();
   return d?.count ?? 0;
 }
 
 async function setCount(uid, date, count) {
-  const url = `${process.env.FIREBASE_DB_URL}/users/${uid}/${date}.json?auth=${process.env.FIREBASE_DB_SECRET}`;
+  const url = `${FIREBASE_BASE}/users/${uid}/${date}.json?auth=${process.env.FIREBASE_DB_SECRET}`;
   await fetch(url, {
     method:  'PUT',
     headers: { 'Content-Type': 'application/json' },
