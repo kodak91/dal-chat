@@ -84,14 +84,23 @@ module.exports = async function handler(req, res) {
         'Content-Type':      'application/json',
         'x-api-key':         process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta':    'web-search-2025-03-05',
       },
       body: JSON.stringify(body),
     });
 
+    if (!upstream.ok) {
+      const errBody = await upstream.text();
+      console.error('Anthropic API error:', upstream.status, errBody);
+      res.writeHead(upstream.status, { ...CORS, 'Content-Type': 'application/json' });
+      res.write(errBody);
+      return res.end();
+    }
+
     if (body.stream) {
       res.writeHead(200, {
         ...CORS,
-        'Content-Type': upstream.headers.get('content-type') || 'text/event-stream',
+        'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
       });
       const reader = upstream.body.getReader();
