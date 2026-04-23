@@ -19,6 +19,7 @@ export default function App() {
     () => localStorage.getItem('splashShown') !== '1'
   );
   const [uid, setUid] = useState(null);
+  const [userNick, setUserNick] = useState('');
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
@@ -26,6 +27,8 @@ export default function App() {
       if (user && !user.isAnonymous) {
         patchFetch(user.uid);
         setUid(user.uid);
+        const nick = user.displayName || user.email?.replace('@dalchat.app', '') || '';
+        setUserNick(nick);
       } else if (user && user.isAnonymous) {
         // 이전 익명 유저 → 로그아웃 처리해서 로그인 화면으로 보냄
         try { await logoutUser(); } catch {}
@@ -39,14 +42,22 @@ export default function App() {
     setShowSplash(false);
   };
 
-  const handleLoginSuccess = (newUid) => {
+  const handleLoginSuccess = (newUid, nick) => {
     patchFetch(newUid);
     setUid(newUid);
+    setUserNick(nick || '');
   };
 
-  // 인증 확인 전엔 스플래시 중이거나 빈 화면
-  if (showSplash) return <SplashScreen onDone={handleSplashDone} />;
+  const handleLogout = () => {
+    setUid(null);
+    setUserNick('');
+  };
+
+  // 인증 확인 전: 로그인된 유저는 스플래시, 아니면 빈 화면
   if (!authChecked) return null;
+  // 비로그인 → 스플래시 없이 바로 로그인 화면
   if (!uid) return <LoginScreen onSuccess={handleLoginSuccess} />;
-  return <DalChat uid={uid} />;
+  // 로그인 완료 → 첫 방문이면 스플래시 후 채팅
+  if (showSplash) return <SplashScreen onDone={handleSplashDone} />;
+  return <DalChat uid={uid} userNick={userNick} onLogout={handleLogout} />;
 }

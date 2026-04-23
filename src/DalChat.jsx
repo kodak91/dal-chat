@@ -3,7 +3,8 @@ import dalPersonality from "./prompts/dal-personality.txt?raw";
 import FeedbackModal from "./FeedbackModal.jsx";
 import NoticeModal from "./NoticeModal.jsx";
 import ReactGA from "react-ga4";
-import { loadMemory, saveMemoryCategory, requestAndSavePushToken } from "./firebase.js";
+import { loadMemory, saveMemoryCategory, requestAndSavePushToken, logoutUser } from "./firebase.js";
+import { startMusic, toggleMusic, isMusicOn } from "./music.js";
 
 
 
@@ -223,13 +224,10 @@ function MoonFace({ isThinking, isSpeaking, size }) {
 
 // ── 히스토리 패널 ──────────────────────────────────────
 
-function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiary, diaryLoading, onOpenDiaries }) {
-
-  const endRef = useRef(null);
+function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiary, diaryLoading, onOpenDiaries, userNick, onLogout }) {
 
   const [memOpen, setMemOpen] = useState(false);
-
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, streamingText]);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const fixed = memoryData.fixed || {};
   const longLines = [
@@ -248,15 +246,20 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
 
   const hasMemory = longLines.length > 0 || recentLines.length > 0;
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try { await logoutUser(); } catch {}
+    onLogout?.();
+  };
+
   return (
 
     <div style={{ position:"fixed",top:0,right:0,bottom:0,width:"min(340px,min(390px,100vw))",background:"#04070f",borderLeft:"1px solid #141e30",zIndex:300,display:"flex",flexDirection:"column",fontFamily:"'Noto Sans KR',sans-serif",animation:"slideIn .22s ease forwards" }}>
 
+      {/* 헤더 */}
       <div style={{ padding:"15px 18px",borderBottom:"1px solid #141e30",display:"flex",alignItems:"center",gap:10,flexShrink:0 }}>
 
         <button onClick={onClose} style={{ background:"none",border:"none",color:"#445",cursor:"pointer",fontSize:18,padding:0,lineHeight:1 }}>✕</button>
-
-        <span style={{ color:"#6878a0",fontSize:13,fontWeight:600 }}>오늘의 대화</span>
 
         <div style={{ marginLeft:"auto",display:"flex",gap:6 }}>
 
@@ -270,6 +273,21 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
 
         </div>
 
+      </div>
+
+      {/* 로그인 상태 */}
+      <div style={{ padding:"14px 18px",borderBottom:"1px solid #141e30",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+        <div>
+          <div style={{ color:"#1e2c3c",fontSize:10,marginBottom:3 }}>로그인</div>
+          <div style={{ color:"#5878a0",fontSize:13,fontWeight:600 }}>{userNick || '—'}</div>
+        </div>
+        <button
+          onClick={handleLogout}
+          disabled={loggingOut}
+          style={{ background:"none",border:"1px solid #1e2c3c",color:"#2a3a4a",fontSize:10,padding:"5px 10px",cursor:loggingOut?"default":"pointer",fontFamily:"inherit" }}
+        >
+          {loggingOut ? "..." : "로그아웃"}
+        </button>
       </div>
 
       {hasMemory && (
@@ -302,9 +320,9 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
 
       )}
 
+      {/* 광고 카드 */}
       <div style={{ flex:1,overflowY:"auto",padding:"14px" }}>
 
-        {/* ── 광고 카드 (달 말풍선 스타일) ── */}
         <div style={{ marginBottom:10,display:"flex",flexDirection:"column",alignItems:"flex-start" }}>
           <div style={{ fontSize:10,color:"#243448",marginBottom:3 }}>🌙 달</div>
           <div style={{ maxWidth:"86%",padding:"8px 12px",background:"#0d0c02",border:"1px solid #281e04",color:"#c8aa30",fontSize:12,lineHeight:1.75,wordBreak:"break-word",whiteSpace:"pre-wrap" }}>
@@ -317,44 +335,6 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
             </a>
           </div>
         </div>
-
-        {!messages.length && <div style={{ color:"#182030",textAlign:"center",marginTop:40,fontSize:12 }}>아직 대화가 없어</div>}
-
-        {messages.map((m,i) => {
-
-          const isUser = m.role==="user";
-
-          return (
-
-            <div key={i} style={{ marginBottom:10,display:"flex",flexDirection:"column",alignItems:isUser?"flex-end":"flex-start" }}>
-
-              <div style={{ fontSize:10,color:"#243448",marginBottom:3 }}>{isUser?"나":"🌙 달"}</div>
-
-              <div style={{ maxWidth:"86%",padding:"8px 12px",background:isUser?"#07102a":"#0d0c02",border:`1px solid ${isUser?"#182848":"#281e04"}`,color:isUser?"#8098c8":"#c8aa30",fontSize:12,lineHeight:1.75,wordBreak:"break-word",whiteSpace:"pre-wrap" }}>{m.content}</div>
-
-            </div>
-
-          );
-
-        })}
-
-        {streamingText && (
-
-          <div style={{ marginBottom:10,display:"flex",flexDirection:"column",alignItems:"flex-start" }}>
-
-            <div style={{ fontSize:10,color:"#243448",marginBottom:3 }}>🌙 달</div>
-
-            <div style={{ maxWidth:"86%",padding:"8px 12px",background:"#0d0c02",border:"1px solid #281e04",color:"#c8aa30",fontSize:12,lineHeight:1.75,wordBreak:"break-word",whiteSpace:"pre-wrap" }}>
-
-              {streamingText}<span style={{ display:"inline-block",width:2,height:10,background:"#c8aa30",marginLeft:2,animation:"blink .6s steps(1) infinite",verticalAlign:"middle" }} />
-
-            </div>
-
-          </div>
-
-        )}
-
-        <div ref={endRef} />
 
       </div>
 
@@ -442,7 +422,9 @@ function DiaryModal({ diaries, onClose }) {
 
 // ── 메인 앱 ────────────────────────────────────────────
 
-export default function DalChat({ uid }) {
+export default function DalChat({ uid, userNick, onLogout }) {
+
+  const [musicOn, setMusicOn]          = useState(() => isMusicOn());
 
   const [messages, setMessages]        = useState([]);
 
@@ -567,6 +549,9 @@ export default function DalChat({ uid }) {
     initTimeRef.current = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', hour12:false});
 
     taRef.current?.focus();
+
+    // 스플래시에서 이어서 재생 (이미 재생 중이면 no-op)
+    startMusic();
 
     // 3초 후 알림 허용 요청 (uid 있을 때만)
     const pushTimer = uid ? setTimeout(() => requestAndSavePushToken(uid), 3000) : null;
@@ -1447,6 +1432,20 @@ ${convoText}`;
 
       {/* ── 상단 버튼 ── */}
 
+      {/* 음악 토글 (좌상단) */}
+      <div style={{ position:"absolute",top:14,left:14,zIndex:202 }}>
+        <button
+          onClick={() => { const next = toggleMusic(); setMusicOn(next); }}
+          title={musicOn ? "음악 끄기" : "음악 켜기"}
+          style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:`1px solid ${musicOn?"#5a4208":"#2a1f4a"}`,color:musicOn?"#c8a030":"#3a3050",padding:"6px 12px",fontSize:13,cursor:"pointer",fontFamily:"inherit",lineHeight:1,position:"relative" }}
+        >
+          <span style={{ position:"relative",display:"inline-block" }}>
+            ♪
+            {!musicOn && <span style={{ position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",width:"100%",height:1,background:"#3a3050",display:"block" }} />}
+          </span>
+        </button>
+      </div>
+
       <div style={{ position:"absolute",top:14,right:14,zIndex:202,display:"flex",gap:7 }}>
 
         <button onClick={() => setShowFeedback(true)} style={{ background:"rgba(2,5,14,.85)",backdropFilter:"blur(8px)",border:"1px solid #2a1f4a",color:"#5a4880",padding:"6px 12px",fontSize:11,cursor:"pointer",fontFamily:"inherit" }}>✉</button>
@@ -1520,7 +1519,7 @@ ${convoText}`;
 
 
 
-      {showHistory && <HistoryPanel messages={messages} streamingText={streamingText} memoryData={memoryData} onClose={()=>setShowHistory(false)} onMakeDiary={makeDiary} diaryLoading={diaryLoading} onOpenDiaries={()=>{setShowDiaries(true);setShowHistory(false);}} />}
+      {showHistory && <HistoryPanel messages={messages} streamingText={streamingText} memoryData={memoryData} onClose={()=>setShowHistory(false)} onMakeDiary={makeDiary} diaryLoading={diaryLoading} onOpenDiaries={()=>{setShowDiaries(true);setShowHistory(false);}} userNick={userNick} onLogout={onLogout} />}
 
       {showDiaries && <DiaryModal diaries={diaries} onClose={()=>setShowDiaries(false)} />}
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { startMusic } from './music.js';
 
 const SENTENCES = [
   { text: '수억 년을 살았습니다.',               gold: false },
@@ -26,6 +27,7 @@ export default function SplashScreen({ onDone }) {
   const activeIdxRef = useRef(-1);
 
   useEffect(() => {
+    startMusic();
     const timers = [];
     const at = (delay, fn) => timers.push(setTimeout(fn, delay));
 

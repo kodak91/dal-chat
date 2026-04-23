@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { loginWithNickname, loginWithGoogle } from './firebase.js';
+import { loginWithNickname, loginWithGoogle, auth } from './firebase.js';
 
 export default function LoginScreen({ onSuccess }) {
   const [nickname, setNickname] = useState('');
@@ -14,7 +14,7 @@ export default function LoginScreen({ onSuccess }) {
     setError(''); setLoading(true);
     try {
       const { uid } = await loginWithNickname(nick, password);
-      onSuccess(uid);
+      onSuccess(uid, nick);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -26,7 +26,8 @@ export default function LoginScreen({ onSuccess }) {
     setError(''); setLoading(true);
     try {
       const uid = await loginWithGoogle();
-      onSuccess(uid);
+      const nick = auth.currentUser?.displayName || auth.currentUser?.email?.replace('@dalchat.app', '') || '';
+      onSuccess(uid, nick);
     } catch (e) {
       if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
         // 사용자가 팝업 닫은 경우 — 에러 표시 안 함
