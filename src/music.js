@@ -1,5 +1,5 @@
 // 싱글톤 오디오 — 컴포넌트 언마운트와 무관하게 음악 유지
-const SRC = '/music/MA_EchoVerse_Little One.wav';
+const SRC = '/music/MA_EchoVerse_Little One convert.mp3';
 const PREF_KEY = 'dal:music:enabled';
 
 let _audio = null;
