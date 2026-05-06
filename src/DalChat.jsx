@@ -320,11 +320,12 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
 
       )}
 
-      {/* 광고 카드 — 최상단 고정 */}
-      <div style={{ padding:"14px 14px 0",flexShrink:0 }}>
-        <div style={{ marginBottom:10,display:"flex",flexDirection:"column",alignItems:"flex-start" }}>
-          <div style={{ fontSize:10,color:"#243448",marginBottom:3 }}>🌙 달</div>
-          <div style={{ maxWidth:"86%",padding:"8px 12px",background:"#0d0c02",border:"1px solid #281e04",color:"#c8aa30",fontSize:12,lineHeight:1.75,wordBreak:"break-word",whiteSpace:"pre-wrap" }}>
+      {/* 대화 + 광고 — 스크롤 영역 */}
+      <div style={{ flex:1,overflowY:"auto",padding:"14px" }}>
+
+        {/* 광고 카드 — 첫 번째 메시지처럼 */}
+        <div style={{ display:"flex", justifyContent:"flex-start", marginBottom:8 }}>
+          <div style={{ maxWidth:"86%", padding:"8px 12px", background:"#0d0c02", border:"1px solid #281e04", color:"#c8aa30", fontSize:12, lineHeight:1.75, wordBreak:"break-word", whiteSpace:"pre-wrap" }}>
             {"부끄러운 얘기지만,\n나는 밥은 안먹지만 토큰은 먹어.\n후원 대신에 한번 봐줘.\n참고로 머리는 밤에 감는게 좋단다.\n이거 한번 써봐."}
             <div style={{ marginTop:6 }}>
               <a href="https://www.wadiz.kr/web/campaign/detail/393687?utm_source=maker_unknown&utm_medium=393687_dalchat" target="_blank" rel="noreferrer" style={{ color:"#8060c0",fontSize:12,textDecoration:"none" }}>→ 와디즈에서 보기</a>
@@ -334,41 +335,30 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
             </a>
           </div>
         </div>
-        <div style={{ borderBottom:"1px solid #141e30",marginBottom:0 }} />
-      </div>
 
-      {/* 오늘의 대화 — 스크롤 영역 */}
-      <div style={{ flex:1,overflowY:"auto",padding:"14px" }}>
-        {(messages.length > 0 || streamingText) ? (
-          <div>
-            <div style={{ fontSize:10,color:"#1e2c3c",marginBottom:10 }}>오늘의 대화</div>
-            {messages.map((m, i) => (
-              <div key={i} style={{ display:"flex", justifyContent: m.role==="user" ? "flex-end" : "flex-start", marginBottom:8 }}>
-                <div style={{
-                  maxWidth:"84%", padding:"8px 12px",
-                  background: m.role==="user" ? "#07102a" : "#0d0c02",
-                  border: `1px solid ${m.role==="user" ? "#182848" : "#281e04"}`,
-                  color: m.role==="user" ? "#8098c8" : "#c8aa30",
-                  fontSize:12, lineHeight:1.75, wordBreak:"break-word", whiteSpace:"pre-wrap",
-                }}>
-                  {m.content}
-                </div>
-              </div>
-            ))}
-            {streamingText && (
-              <div style={{ display:"flex", justifyContent:"flex-start", marginBottom:8 }}>
-                <div style={{ maxWidth:"84%", padding:"8px 12px", background:"#0d0c02", border:"1px solid #281e04", color:"#c8aa30", fontSize:12, lineHeight:1.75, wordBreak:"break-word", whiteSpace:"pre-wrap" }}>
-                  {streamingText}
-                  <span style={{ display:"inline-block",width:2,height:10,background:"#c8aa30",marginLeft:2,animation:"blink .6s steps(1) infinite",verticalAlign:"middle" }} />
-                </div>
-              </div>
-            )}
+        {/* 오늘의 대화 */}
+        {messages.map((m, i) => (
+          <div key={i} style={{ display:"flex", justifyContent: m.role==="user" ? "flex-end" : "flex-start", marginBottom:8 }}>
+            <div style={{
+              maxWidth:"84%", padding:"8px 12px",
+              background: m.role==="user" ? "#07102a" : "#0d0c02",
+              border: `1px solid ${m.role==="user" ? "#182848" : "#281e04"}`,
+              color: m.role==="user" ? "#8098c8" : "#c8aa30",
+              fontSize:12, lineHeight:1.75, wordBreak:"break-word", whiteSpace:"pre-wrap",
+            }}>
+              {m.content}
+            </div>
           </div>
-        ) : (
-          <div style={{ color:"#141c28",textAlign:"center",marginTop:24,fontSize:12,lineHeight:2 }}>
-            아직 대화가 없어<br/><span style={{ fontSize:11,color:"#101820" }}>달에게 말을 걸어봐</span>
+        ))}
+        {streamingText && (
+          <div style={{ display:"flex", justifyContent:"flex-start", marginBottom:8 }}>
+            <div style={{ maxWidth:"84%", padding:"8px 12px", background:"#0d0c02", border:"1px solid #281e04", color:"#c8aa30", fontSize:12, lineHeight:1.75, wordBreak:"break-word", whiteSpace:"pre-wrap" }}>
+              {streamingText}
+              <span style={{ display:"inline-block",width:2,height:10,background:"#c8aa30",marginLeft:2,animation:"blink .6s steps(1) infinite",verticalAlign:"middle" }} />
+            </div>
           </div>
         )}
+
       </div>
 
     </div>
