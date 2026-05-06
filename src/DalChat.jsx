@@ -320,12 +320,27 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
 
       )}
 
-      {/* 대화 기록 + 광고 */}
-      <div style={{ flex:1,overflowY:"auto",padding:"14px" }}>
+      {/* 광고 카드 — 최상단 고정 */}
+      <div style={{ padding:"14px 14px 0",flexShrink:0 }}>
+        <div style={{ marginBottom:10,display:"flex",flexDirection:"column",alignItems:"flex-start" }}>
+          <div style={{ fontSize:10,color:"#243448",marginBottom:3 }}>🌙 달</div>
+          <div style={{ maxWidth:"86%",padding:"8px 12px",background:"#0d0c02",border:"1px solid #281e04",color:"#c8aa30",fontSize:12,lineHeight:1.75,wordBreak:"break-word",whiteSpace:"pre-wrap" }}>
+            {"부끄러운 얘기지만,\n나는 밥은 안먹지만 토큰은 먹어.\n후원 대신에 한번 봐줘.\n참고로 머리는 밤에 감는게 좋단다.\n이거 한번 써봐."}
+            <div style={{ marginTop:6 }}>
+              <a href="https://www.wadiz.kr/web/campaign/detail/393687?utm_source=maker_unknown&utm_medium=393687_dalchat" target="_blank" rel="noreferrer" style={{ color:"#8060c0",fontSize:12,textDecoration:"none" }}>→ 와디즈에서 보기</a>
+            </div>
+            <a href="https://www.wadiz.kr/web/campaign/detail/393687?utm_source=maker_unknown&utm_medium=393687_dalchat" target="_blank" rel="noreferrer" style={{ display:"block",marginTop:8 }}>
+              <img src="/scoop_ad2.png" alt="" style={{ width:"100%",borderRadius:8,display:"block" }} />
+            </a>
+          </div>
+        </div>
+        <div style={{ borderBottom:"1px solid #141e30",marginBottom:0 }} />
+      </div>
 
-        {/* 오늘의 대화 */}
+      {/* 오늘의 대화 — 스크롤 영역 */}
+      <div style={{ flex:1,overflowY:"auto",padding:"14px" }}>
         {(messages.length > 0 || streamingText) ? (
-          <div style={{ marginBottom:16 }}>
+          <div>
             <div style={{ fontSize:10,color:"#1e2c3c",marginBottom:10 }}>오늘의 대화</div>
             {messages.map((m, i) => (
               <div key={i} style={{ display:"flex", justifyContent: m.role==="user" ? "flex-end" : "flex-start", marginBottom:8 }}>
@@ -350,25 +365,10 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
             )}
           </div>
         ) : (
-          <div style={{ color:"#141c28",textAlign:"center",marginTop:24,marginBottom:20,fontSize:12,lineHeight:2 }}>
+          <div style={{ color:"#141c28",textAlign:"center",marginTop:24,fontSize:12,lineHeight:2 }}>
             아직 대화가 없어<br/><span style={{ fontSize:11,color:"#101820" }}>달에게 말을 걸어봐</span>
           </div>
         )}
-
-        {/* 광고 카드 */}
-        <div style={{ marginBottom:10,display:"flex",flexDirection:"column",alignItems:"flex-start" }}>
-          <div style={{ fontSize:10,color:"#243448",marginBottom:3 }}>🌙 달</div>
-          <div style={{ maxWidth:"86%",padding:"8px 12px",background:"#0d0c02",border:"1px solid #281e04",color:"#c8aa30",fontSize:12,lineHeight:1.75,wordBreak:"break-word",whiteSpace:"pre-wrap" }}>
-            {"부끄러운 얘기지만,\n나는 밥은 안먹지만 토큰은 먹어.\n후원 대신에 한번 봐줘.\n참고로 머리는 밤에 감는게 좋단다.\n이거 한번 써봐."}
-            <div style={{ marginTop:6 }}>
-              <a href="https://www.wadiz.kr/web/campaign/detail/393687?utm_source=maker_unknown&utm_medium=393687_dalchat" target="_blank" rel="noreferrer" style={{ color:"#8060c0",fontSize:12,textDecoration:"none" }}>→ 와디즈에서 보기</a>
-            </div>
-            <a href="https://www.wadiz.kr/web/campaign/detail/393687?utm_source=maker_unknown&utm_medium=393687_dalchat" target="_blank" rel="noreferrer" style={{ display:"block",marginTop:8 }}>
-              <img src="/scoop_ad2.png" alt="" style={{ width:"100%",borderRadius:8,display:"block" }} />
-            </a>
-          </div>
-        </div>
-
       </div>
 
     </div>
@@ -1252,11 +1252,11 @@ ${convoText}`;
                 {userBubble}
               </div>
             )}
-            <p style={{ margin:"0",textAlign:"center",color:"rgba(255,255,255,.72)",fontSize:13,lineHeight:1.85,textShadow:"0 1px 6px rgba(0,0,0,.5)" }}>
-              지금은 달이 안보이네..<br />밤에 다시 올게.
-            </p>
+            <div style={{ maxWidth:"min(240px,70vw)",padding:"11px 16px",background:"rgba(18,12,2,.93)",border:"1.5px solid #5a4208",color:"#e8c828",fontSize:13,lineHeight:1.85,fontFamily:"'Noto Sans KR',sans-serif",boxShadow:"0 4px 20px rgba(0,0,0,.85)",whiteSpace:"pre-wrap",textAlign:"center",animation:"bubblePop .3s cubic-bezier(.34,1.56,.64,1) forwards" }}>
+              {"지금은 달이 안보이네..\n밤에 다시 올게."}
+            </div>
             {dayResetMsg && (
-              <p style={{ margin:"12px 0 0",color:"rgba(255,210,100,.85)",fontSize:12,textShadow:"0 1px 4px rgba(0,0,0,.6)",textAlign:"center" }}>{dayResetMsg}</p>
+              <div style={{ marginTop:10,padding:"7px 14px",background:"rgba(18,12,2,.85)",border:"1px solid #5a3008",color:"rgba(255,210,100,.9)",fontSize:12,fontFamily:"'Noto Sans KR',sans-serif",textAlign:"center" }}>{dayResetMsg}</div>
             )}
           </div>
         </>
