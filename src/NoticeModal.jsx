@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 // 새 공지 올릴 때 이 값만 바꾸면 다시 노출됨
-const NOTICE_VERSION = "2026-04";
+const NOTICE_VERSION = "2026-05-06";
 const STORAGE_KEY    = "dal:notice:dismissed";
 
 export default function NoticeModal() {
