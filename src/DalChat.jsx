@@ -37,11 +37,14 @@ const SESSION_MEMIDX = "dal:session:memidx"; // 노트에 반영된 메시지 �
 
 // 예전 방식(카테고리 목록) 기억 — 지우지 않고 읽어서 새 노트로 옮김
 const LEGACY_CATEGORIES = ['fixed', 'facts', 'prefs', 'recent', 'relation', 'work', 'mental'];
-const MEMORY_KEYS = ['note', 'meta', ...LEGACY_CATEGORIES];
+const MEMORY_KEYS = ['note', 'meta', 'style', ...LEGACY_CATEGORIES];
 
 const NOTE_EVERY   = 5;    // 사용자 메시지 5개마다 노트 정리
 const NOTE_MAX_LEN = 3000;
 const META_THROTTLE = 10 * 60 * 1000; // 마지막 대화 시각 저장은 10분에 한 번
+const STYLE_KEEP    = 40;  // 말투 참고용으로 저장하는 사용자 문장 수
+const STYLE_SHOW    = 25;  // 그중 달에게 보여주는 수
+const STYLE_MAX_LEN = 150; // 너무 긴 문장은 말투 샘플에서 제외
 
 const NOTE_SCHEMA = {
   type: "object",
@@ -88,6 +91,21 @@ function legacyToText(m) {
   return lines.length ? `(예전에 적어둔 기억. 날짜 없는 건 오래됐을 수 있어)\n${lines.join('\n')}` : '';
 }
 
+// 사용자가 실제로 한 말을 말투 샘플로 모음 (최근 것 우선, 중복 제거)
+function mergeStyle(style, msgs) {
+  const fresh = msgs
+    .filter(m => m.role === "user")
+    .map(m => (m.content || "").trim())
+    .filter(t => t && t.length <= STYLE_MAX_LEN);
+  if (!fresh.length) return null;
+  const samples = [...(style?.samples || []).filter(t => !fresh.includes(t)), ...fresh].slice(-STYLE_KEEP);
+  return { samples, updatedAt: Date.now() };
+}
+
+function avgLen(lines) {
+  return lines.length ? Math.round(lines.reduce((n, t) => n + t.length, 0) / lines.length) : 0;
+}
+
 // 마지막 대화 시각. 예전 사용자는 recent 기억의 가장 늦은 날짜로 대신함
 function lastChatAtOf(m) {
   if (m.meta?.lastChatAt) return m.meta.lastChatAt;
@@ -108,11 +126,12 @@ ${convo || '(없음 — 기존 노트만 아래 형식으로 정리해줘)'}
 
 새 대화를 반영해서 노트 전체를 다시 써줘.
 
-형식: 아래 다섯 칸. 내용 없는 칸은 칸 이름만 둬.
+형식: 아래 여섯 칸. 내용 없는 칸은 칸 이름만 둬.
 [이 사람] 이름, 나이, 하는 일, 성격, 취향처럼 잘 안 바뀌는 것
 [요즘 상황] 진행 중인 일이나 고민. 줄 끝에 들은 날짜를 (10/3)처럼 붙여
 [지나간 일] 끝났거나 해결된 일. 한 줄씩 짧게, 날짜 포함
-[우리 사이] 달과의 관계, 자주 하는 농담, 대화 분위기, 달에게 바라는 말투
+[말투와 유머] 이 사람이 말하는 방식, 유머 코드, 욕 쓰는 정도, 자주 쓰는 말, 화나거나 우울할 때 말하는 패턴
+[우리 사이] 달과의 관계, 자주 하는 농담, 대화 분위기, 달에게 바라는 것
 [최근 대화] 대화한 날짜별 한 줄 요약. 최근 5개까지만
 
 규칙:
@@ -154,6 +173,7 @@ const defaultMemory = () => ({
   recent:   { items: [] },
   note:     null,
   meta:     {},
+  style:    null,
 });
 const defaultOnboard = () => ({ totalMessages: 0 });
 
@@ -180,6 +200,15 @@ const buildSystemPrompt = (memoryData, onboarding, dailyMem = [], initTime = nul
     if (total <= 2) {
       memSection += `\n오랜만에 온 거면 그만큼 반응해줘. 며칠이면 가볍게 아는 척, 몇 주면 반가워하거나 살짝 서운한 티, 몇 달이면 진짜 오랜만이라는 티. 첫 인사에서만.`;
     }
+  }
+
+  // 이 사람 말투: 실제로 한 말 + 평균 길이
+  const samples = (memoryData.style?.samples || []).slice(-STYLE_SHOW);
+  if (samples.length) {
+    memSection += `\n\n[이 사람 말투 — 실제로 한 말들]\n${samples.map(t => `- ${t}`).join('\n')}`;
+    memSection += `\n이 사람은 한 번에 평균 ${avgLen(samples)}자 정도로 말해. 너도 그 정도로.`;
+  } else {
+    memSection += `\n\n[이 사람 말투]: 아직 잘 몰라. 지금 대화를 보고 맞춰가. 처음엔 짧고 편하게.`;
   }
 
   // 달의 노트 (없으면 예전 방식 기억)
@@ -576,7 +605,8 @@ export default function DalChat({ uid, userNick, onLogout }) {
 
         const sessionStart = getSessionStart();
         if (pendingTail) {
-          // 지난번 대화 끝부분을 노트에 반영
+          // 지난번 대화 끝부분을 노트·말투에 반영
+          saveStyle(pendingTail.msgs);
           updateNote(pendingTail.msgs, pendingTail.savedAt).then(ok => {
             if (!ok) return;
             if (sessionStart && pendingTail.savedAt >= sessionStart) {
@@ -856,17 +886,29 @@ export default function DalChat({ uid, userNick, onLogout }) {
     }
   }, []);
 
+  // 사용자가 실제로 한 말을 말투 샘플로 저장
+  const saveStyle = useCallback((msgs) => {
+    const uid = uidRef.current;
+    const style = mergeStyle(memoryDataRef.current.style, msgs);
+    if (!uid || !style) return;
+    const updated = { ...memoryDataRef.current, style };
+    memoryDataRef.current = updated;
+    setMemoryData(updated);
+    saveMemoryCategory(uid, 'style', style).catch(() => {});
+  }, []);
+
   // 아직 노트에 안 들어간 이번 대화를 정리
   const flushNote = useCallback((history) => {
     const end = history.length;
     const pending = history.slice(memIdxRef.current, end);
     if (pending.length < 2) return;
+    saveStyle(pending);
     updateNote(pending, Date.now()).then(ok => {
       if (!ok) return;
       memIdxRef.current = end;
       localStorage.setItem(SESSION_MEMIDX, JSON.stringify({ idx: end, savedAt: Date.now() }));
     });
-  }, [updateNote]);
+  }, [updateNote, saveStyle]);
 
 
 

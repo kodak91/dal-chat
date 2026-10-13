@@ -100,6 +100,7 @@ function defaultCategoryData(cat) {
   if (cat === 'fixed') return { name: null, age: null, purpose: null };
   if (cat === 'note')  return null;
   if (cat === 'meta')  return {};
+  if (cat === 'style') return null;
   return { items: [] };
 }
 
