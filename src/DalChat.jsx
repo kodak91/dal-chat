@@ -24,8 +24,8 @@ const IMG_PERSON="/person.png";
 
 const DAY_START_H = 5;
 const DAY_END_H   = 17;
-const SLEEP_AT    = 50;
-const LOCK_AT     = 60;
+const SLEEP_AT    = 100;
+const LOCK_AT     = 120;
 
 const ONBOARD_KEY    = "dal:onboarding";
 const SESSION_MSGS   = "dal:session:messages";

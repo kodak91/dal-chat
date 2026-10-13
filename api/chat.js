@@ -1,8 +1,8 @@
 const crypto = require('crypto');
 
 const MODEL      = 'claude-haiku-5-5';
-const SLEEP_AT   = 40;
-const LOCK_AT    = 50;
+const SLEEP_AT   = 80;
+const LOCK_AT    = 100;
 const SLEEP_NOTE = '\n\n[참고]: 오늘 대화 많이 했어. 슬슬 졸려와. 자연스럽게 피곤함 드러내도 돼.';
 const LOCK_MSG   = '미안한데 이제 가봐야겠다. 나중에 다시 보자.';
 const EFFORTS    = ['low', 'medium']; // 클라이언트가 고를 수 있는 생각 깊이
