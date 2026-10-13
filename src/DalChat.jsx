@@ -792,7 +792,7 @@ ${convoText}`;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-haiku-5-5",
-          max_tokens: 400,
+          max_tokens: 2000,
           messages: [{ role: "user", content: prompt }]
         })
       });
@@ -870,7 +870,7 @@ ${convoText}`;
       const res = await fetch(`${import.meta.env.VITE_API_URL}/chat`, {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
-          model:"claude-haiku-5-5", max_tokens:120,
+          model:"claude-haiku-5-5", max_tokens:1000,
           messages:[{role:"user",content:`다음 대화를 핵심만 2-3줄로 요약해. 감정·사건·맥락만:\n${convoText}`}]
         })
       });
@@ -995,7 +995,7 @@ ${convoText}`;
 
           model: "claude-haiku-5-5",
 
-          max_tokens: 300,
+          max_tokens: 2000,
 
           system: buildSystemPrompt(memoryDataRef.current, onboardingRef.current, dailyMemRef.current, initTimeRef.current),
 
@@ -1137,7 +1137,7 @@ ${convoText}`;
 
         body: JSON.stringify({
 
-          model: "claude-haiku-5-5", max_tokens: 700,
+          model: "claude-haiku-5-5", max_tokens: 3000,
 
           messages: [{ role:"user", content:`아래 대화를 바탕으로 일기를 써줘. 오늘 날짜는 ${today}야.\n\n[규칙]\n- 글 잘 쓰는 작가가 혼자 쓴 사적인 일기체. 담백하고 감성적인 문장.\n- 1인칭. 내 감정과 생각이 중심. 달(AI)과의 대화는 자연스럽게 녹여.\n- 문단을 2~3개로 나눠서 호흡 있게 써줘. 각 문단은 빈 줄로 구분.\n- 250~400자. 과장 없이, 꾸밈 없이. 일어난 일 나열 금지.\n- JSON만 반환: {"mood":"오늘기분한단어","moodEmoji":"이모지1개","content":"일기내용"}\n\n대화:\n${convo}` }],
 

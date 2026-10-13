@@ -74,7 +74,7 @@ module.exports = async function handler(req, res) {
 
   // 모델 고정 + 40회 이상 졸림 노트 추가
   const body = { ...req.body, model: MODEL };
-  body.thinking = { type: 'disabled' }; // Haiku 5.5는 기본으로 생각(thinking)을 켬 → 짧은 max_tokens 안에서 답이 잘리지 않게 끔
+  body.output_config = { ...body.output_config, effort: 'low' }; // 생각(thinking)은 켜두되, 가벼운 대화는 빠르게 답하도록 low
   if (count >= SLEEP_AT && body.system) body.system += SLEEP_NOTE;
   body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }]; // 웹서치 툴 추가
 
