@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const MODEL      = 'claude-haiku-4-5-20251001';
+const MODEL      = 'claude-haiku-5-5';
 const SLEEP_AT   = 40;
 const LOCK_AT    = 50;
 const SLEEP_NOTE = '\n\n[참고]: 오늘 대화 많이 했어. 슬슬 졸려와. 자연스럽게 피곤함 드러내도 돼.';
@@ -74,6 +74,7 @@ module.exports = async function handler(req, res) {
 
   // 모델 고정 + 40회 이상 졸림 노트 추가
   const body = { ...req.body, model: MODEL };
+  body.thinking = { type: 'disabled' }; // Haiku 5.5는 기본으로 생각(thinking)을 켬 → 짧은 max_tokens 안에서 답이 잘리지 않게 끔
   if (count >= SLEEP_AT && body.system) body.system += SLEEP_NOTE;
   body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }]; // 웹서치 툴 추가
 
