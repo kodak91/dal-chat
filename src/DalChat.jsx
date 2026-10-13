@@ -22,8 +22,6 @@ const IMG_PERSON="/person.png";
 
 // ── 메모리 상수 ────────────────────────────────────────
 
-const SHORT_TTL = 14 * 24 * 60 * 60 * 1000; // 14일
-
 const DAY_START_H = 5;
 const DAY_END_H   = 17;
 const SLEEP_AT    = 50;
@@ -35,31 +33,104 @@ const SESSION_COMP   = "dal:session:compress";
 const SESSION_DAILY  = "dal:session:daily";
 const DEV_UNLOCK_KEY = "dal:dev:unlocked";
 
-const BASE_CATEGORIES = ['fixed', 'facts', 'prefs', 'recent'];
+const SESSION_MEMIDX = "dal:session:memidx"; // 노트에 반영된 메시지 위치
 
-const CATEGORY_KEYWORDS = {
-  relation: ['여자친구', '남자친구', '연인', '결혼', '데이트',
-             '가족', '엄마', '아빠', '형', '언니', '동생', '친구'],
-  work:     ['직장', '회사', '팀장', '상사', '업무', '출근',
-             '퇴근', '동료', '취업', '이직', '면접'],
-  mental:   ['우울', '불안', '힘들', '외로', '스트레스',
-             '무기력', '화나', '슬프', '지쳐'],
+// 예전 방식(카테고리 목록) 기억 — 지우지 않고 읽어서 새 노트로 옮김
+const LEGACY_CATEGORIES = ['fixed', 'facts', 'prefs', 'recent', 'relation', 'work', 'mental'];
+const MEMORY_KEYS = ['note', 'meta', ...LEGACY_CATEGORIES];
+
+const NOTE_EVERY   = 5;    // 사용자 메시지 5개마다 노트 정리
+const NOTE_MAX_LEN = 3000;
+const META_THROTTLE = 10 * 60 * 1000; // 마지막 대화 시각 저장은 10분에 한 번
+
+const NOTE_SCHEMA = {
+  type: "object",
+  properties: {
+    name: { type: "string" },
+    note: { type: "string" },
+  },
+  required: ["name", "note"],
+  additionalProperties: false,
 };
 
-function detectCategories(messages) {
-  const text = messages.map(m => m.content || '').join(' ');
-  const extra = Object.entries(CATEGORY_KEYWORDS)
-    .filter(([, kws]) => kws.some(kw => text.includes(kw)))
-    .map(([cat]) => cat);
-  return [...new Set([...BASE_CATEGORIES, ...extra])];
+const DAY_MS = 86400000;
+
+function fmtDate(ms) {
+  return new Date(ms).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
 }
 
-// 현재 유효한 세션의 시작 timestamp 반환. 낮(오전5시~오후5시)이면 null.
+// 경과 시간을 "3일", "2주", "4달" 같은 말로. 하루 미만이면 null
+function gapText(ms) {
+  const d = Math.floor(ms / DAY_MS);
+  if (d < 1)   return null;
+  if (d < 7)   return `${d}일`;
+  if (d < 30)  return `${Math.floor(d / 7)}주`;
+  if (d < 365) return `${Math.floor(d / 30)}달`;
+  return `${Math.floor(d / 365)}년`;
+}
+
+// 예전 카테고리 기억을 글로 펼침 (새 노트로 옮기기 전까지 임시로 사용)
+function legacyToText(m) {
+  const lines = [];
+  const f = m.fixed || {};
+  if (f.name)    lines.push(`이름: ${f.name}`);
+  if (f.age)     lines.push(`나이: ${f.age}`);
+  if (f.purpose) lines.push(`달 찾는 이유: ${f.purpose}`);
+  const add = (label, items) => { if (items?.length) lines.push(`${label}: ${items.join(', ')}`); };
+  add('기타', m.facts?.items);
+  add('관계', m.relation?.items);
+  add('직장/일', m.work?.items);
+  add('감정/심리', m.mental?.items);
+  add('바라는 말투', m.prefs?.items);
+  (m.recent?.items || []).slice(-6).forEach(e => lines.push(`(${fmtDate(e.createdAt)}) ${e.content}`));
+  return lines.length ? `(예전에 적어둔 기억. 날짜 없는 건 오래됐을 수 있어)\n${lines.join('\n')}` : '';
+}
+
+// 마지막 대화 시각. 예전 사용자는 recent 기억의 가장 늦은 날짜로 대신함
+function lastChatAtOf(m) {
+  if (m.meta?.lastChatAt) return m.meta.lastChatAt;
+  const ts = (m.recent?.items || []).map(e => e.createdAt).filter(Boolean);
+  return ts.length ? Math.max(...ts) : null;
+}
+
+function buildNotePrompt(current, convo, convoDate) {
+  const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+  return `너는 '달'이라는 캐릭터의 기억 노트를 관리해. 달은 이 노트를 보고 사용자를 기억해. 사용자도 이 노트를 볼 수 있어.
+오늘 날짜: ${today}
+
+[지금까지의 노트]
+${current || '(아직 없음)'}
+
+[새 대화] ${convo ? `(${convoDate})` : ''}
+${convo || '(없음 — 기존 노트만 아래 형식으로 정리해줘)'}
+
+새 대화를 반영해서 노트 전체를 다시 써줘.
+
+형식: 아래 다섯 칸. 내용 없는 칸은 칸 이름만 둬.
+[이 사람] 이름, 나이, 하는 일, 성격, 취향처럼 잘 안 바뀌는 것
+[요즘 상황] 진행 중인 일이나 고민. 줄 끝에 들은 날짜를 (10/3)처럼 붙여
+[지나간 일] 끝났거나 해결된 일. 한 줄씩 짧게, 날짜 포함
+[우리 사이] 달과의 관계, 자주 하는 농담, 대화 분위기, 달에게 바라는 말투
+[최근 대화] 대화한 날짜별 한 줄 요약. 최근 5개까지만
+
+규칙:
+- 새 정보가 기존 내용과 다르면 새 걸로 고쳐. (예: 이직 준비 중 → 이직함)
+- 해결됐거나 끝난 일은 [요즘 상황]에서 [지나간 일]로 옮겨.
+- [요즘 상황]은 날짜를 보고 판단해. 두 달 넘게 다시 나온 적 없으면 '(오래됨, 지금은 모름)'을 붙이거나 [지나간 일]로 옮겨.
+- 날짜를 모르는 예전 기록은 '(예전)'이라고 표시해.
+- 대화에 실제로 나온 것만 적어. 추측하지 마.
+- 겹치는 건 합치고, 사소하고 오래된 건 지워. 전체 1500자 이내.
+- 사용자가 읽어도 기분 나쁘지 않게, 담백하게 써.
+
+name: 사용자 이름이나 불러달라는 호칭. 모르면 빈 문자열.`;
+}
+
 // 응답의 text 블록만 모아서 반환 (웹서치 등 다른 블록이 앞에 올 수 있음)
 function responseText(data) {
   return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
 }
 
+// 현재 유효한 세션의 시작 timestamp 반환. 낮(오전5시~오후5시)이면 null.
 function getSessionStart() {
   const now = new Date();
   const h = now.getHours();
@@ -79,13 +150,11 @@ const defaultMemory = () => ({
   work:     { items: [] },
   mental:   { items: [] },
   recent:   { items: [] },
+  note:     null,
+  meta:     {},
 });
 const defaultOnboard = () => ({ totalMessages: 0 });
 
-function pruneShort(arr) {
-  const now = Date.now();
-  return (arr || []).filter(e => e.expiresAt > now).slice(-20);
-}
 
 
 
@@ -93,32 +162,29 @@ function pruneShort(arr) {
 
 const buildSystemPrompt = (memoryData, onboarding, dailyMem = [], initTime = null) => {
   const now = Date.now();
+  const dateStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   const timeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-  let memSection = `\n\n[현재 시각: ${timeStr}]`;
+  let memSection = `\n\n[지금]: ${dateStr} ${timeStr}`;
 
   if (initTime) memSection += `\n\n[대화 시작 시간]: ${initTime}`;
 
-  // fixed + facts → [이 사람에 대해 알고 있는 것]
-  const fixed = memoryData.fixed || {};
-  const longParts = [];
-  if (fixed.name)    longParts.push(`이름: ${fixed.name}`);
-  if (fixed.age)     longParts.push(`나이: ${fixed.age}`);
-  if (fixed.purpose) longParts.push(`달 찾는 이유: ${fixed.purpose}`);
-  const facts = memoryData.facts?.items || [];
-  if (facts.length)  longParts.push(`기타: ${facts.join(', ')}`);
-  if (longParts.length) {
-    memSection += `\n\n[이 사람에 대해 알고 있는 것]\n${longParts.join('\n')}`;
+  const total = onboarding?.totalMessages || 0;
+
+  // 마지막으로 대화한 때 → 오랜만이면 반응 + 예전 기억이 지금도 맞는지 조심
+  const lastChatAt = lastChatAtOf(memoryData);
+  const gap = lastChatAt ? gapText(now - lastChatAt) : null;
+  if (gap) {
+    memSection += `\n\n[마지막으로 대화한 때]: ${fmtDate(lastChatAt)} (${gap} 전)`;
+    if (total <= 2) {
+      memSection += `\n오랜만에 온 거면 그만큼 반응해줘. 며칠이면 가볍게 아는 척, 몇 주면 반가워하거나 살짝 서운한 티, 몇 달이면 진짜 오랜만이라는 티. 첫 인사에서만.`;
+    }
   }
 
-  // recent → [최근에 있었던 일]
-  const recentItems = pruneShort(memoryData.recent?.items || []).slice(-6);
-  if (recentItems.length) {
-    const lines = recentItems.map(e => {
-      const daysAgo = Math.floor((now - e.createdAt) / 86400000);
-      const when = daysAgo === 0 ? '오늘' : daysAgo === 1 ? '어제' : `${daysAgo}일 전`;
-      return `- ${when}: ${e.content}`;
-    }).join('\n');
-    memSection += `\n\n[최근에 있었던 일]\n${lines}`;
+  // 달의 노트 (없으면 예전 방식 기억)
+  const noteText = memoryData.note?.text || legacyToText(memoryData);
+  if (noteText) {
+    memSection += `\n\n[달의 노트 — 이 사람에 대해 기억하는 것]\n${noteText}`;
+    memSection += `\n\n[노트 쓰는 법]: [요즘 상황]은 적힌 날짜 기준이야. 시간이 지났으면 이미 끝났거나 바뀌었을 수 있으니 지금도 그런 것처럼 계속 꺼내지 마. 궁금하면 "그때 그거 어떻게 됐어?"처럼 한 번만 가볍게 물어봐. 기억은 자연스러울 때만 꺼내고, 기억한다고 늘어놓지 마.`;
   }
 
   // 오늘 이전 대화 요약
@@ -126,29 +192,11 @@ const buildSystemPrompt = (memoryData, onboarding, dailyMem = [], initTime = nul
     memSection += `\n\n[오늘 이전 대화 요약]\n${dailyMem.map(d => d.summary).join('\n---\n')}`;
   }
 
-  // prefs
-  const prefsData = memoryData.prefs || {};
-  const prefs = prefsData.items || [];
-  if (prefs.length) {
-    memSection += `\n\n[사용자 말투/성격 요청 — 참고만, 기본 성격 침해 금지]: ${prefs.join(', ')}`;
-  }
-  if (prefsData.lang)           memSection += `\n[선호언어]: ${prefsData.lang}`;
-  if (prefsData.tone)           memSection += `\n[선호톤]: ${prefsData.tone}`;
-  if (prefsData.profanity != null) memSection += `\n[욕설허용]: ${prefsData.profanity}`;
-
-  // 동적 카테고리 — 로드된 것만 추가
-  const relation = memoryData.relation?.items || [];
-  const work     = memoryData.work?.items || [];
-  const mental   = memoryData.mental?.items || [];
-  if (relation.length) memSection += `\n\n[관계]: ${relation.join(', ')}`;
-  if (work.length)     memSection += `\n\n[직장/일]: ${work.join(', ')}`;
-  if (mental.length)   memSection += `\n\n[감정/심리 패턴]: ${mental.join(', ')}`;
-
   // 온보딩
-  const total = onboarding?.totalMessages || 0;
+  const name = memoryData.note?.name || memoryData.fixed?.name;
   const missing = [];
-  if (!fixed.name)    missing.push('이름');
-  if (!fixed.purpose) missing.push('달한테 주로 뭘 털어놓으러 오는지(하소연인지, 심심해서인지, 화풀이인지 등)');
+  if (!name)     missing.push('이름');
+  if (!noteText) missing.push('달한테 주로 뭘 털어놓으러 오는지(하소연인지, 심심해서인지, 화풀이인지 등)');
   if (missing.length && total <= 30) {
     memSection += `\n\n[참고]: 아직 모르는 것이 있어 — "${missing[0]}". 대화 흐름상 자연스러울 때 슬쩍 한 번만 물어봐. 억지로 물어볼 필요는 없어.`;
   }
@@ -234,22 +282,8 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
   const [memOpen, setMemOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const fixed = memoryData.fixed || {};
-  const longLines = [
-    fixed.name    ? `이름: ${fixed.name}` : null,
-    fixed.age     ? `나이: ${fixed.age}` : null,
-    fixed.purpose ? `목적: ${fixed.purpose}` : null,
-    ...(memoryData.facts?.items || []).map(f => `• ${f}`),
-  ].filter(Boolean);
-
-  const now = Date.now();
-  const recentLines = pruneShort(memoryData.recent?.items || []).slice(-4).map(e => {
-    const daysAgo = Math.floor((now - e.createdAt) / 86400000);
-    const when = daysAgo === 0 ? '오늘' : daysAgo === 1 ? '어제' : `${daysAgo}일 전`;
-    return `${when}: ${e.content}`;
-  });
-
-  const hasMemory = longLines.length > 0 || recentLines.length > 0;
+  const memText = memoryData.note?.text || legacyToText(memoryData);
+  const hasMemory = !!memText;
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -308,16 +342,8 @@ function HistoryPanel({ messages, streamingText, memoryData, onClose, onMakeDiar
           </button>
 
           {memOpen && (
-            <div style={{ padding:"0 18px 10px" }}>
-              {longLines.length > 0 && (
-                <div style={{ color:"#304458",fontSize:11,lineHeight:1.6,whiteSpace:"pre-wrap" }}>{longLines.join('\n')}</div>
-              )}
-              {recentLines.length > 0 && (
-                <div style={{ marginTop: longLines.length > 0 ? 6 : 0 }}>
-                  <div style={{ color:"#1a2530",fontSize:10,marginBottom:2 }}>최근 (시간이 지나면 사라져)</div>
-                  <div style={{ color:"#253040",fontSize:11,lineHeight:1.6,whiteSpace:"pre-wrap" }}>{recentLines.join('\n')}</div>
-                </div>
-              )}
+            <div style={{ padding:"0 18px 10px",maxHeight:"40vh",overflowY:"auto" }}>
+              <div style={{ color:"#304458",fontSize:11,lineHeight:1.6,whiteSpace:"pre-wrap" }}>{memText}</div>
             </div>
           )}
 
@@ -503,7 +529,9 @@ export default function DalChat({ uid, userNick, onLogout }) {
 
   const uidRef                         = useRef(null);
 
-  const loadedCatsRef                  = useRef(new Set(BASE_CATEGORIES));
+  const memIdxRef                      = useRef(0);     // historyRef 중 노트에 반영된 위치
+  const noteBusyRef                    = useRef(false);
+  const metaSavedAtRef                 = useRef(0);
 
   const onboardingRef                  = useRef(defaultOnboard());
 
@@ -524,16 +552,44 @@ export default function DalChat({ uid, userNick, onLogout }) {
 
   useEffect(() => {
 
+    // 세션 데이터 복원 전에, 노트에 아직 안 들어간 지난 대화를 챙겨둠
+    let pendingTail = null;
+    try {
+      const r = localStorage.getItem(SESSION_MSGS);
+      const m = localStorage.getItem(SESSION_MEMIDX);
+      if (r) {
+        const { msgs, savedAt } = JSON.parse(r);
+        const idx = m ? (JSON.parse(m).idx || 0) : 0;
+        if (msgs?.length > idx + 1) pendingTail = { msgs: msgs.slice(idx), end: msgs.length, savedAt };
+      }
+    } catch {}
+
     // props.uid로 Firebase 메모리 로드 + 푸시 토큰 등록
     if (uid) {
       uidRef.current = uid;
-      loadMemory(uid, BASE_CATEGORIES).then((mem) => {
+      loadMemory(uid, MEMORY_KEYS).then((mem) => {
         const merged = { ...defaultMemory(), ...mem };
         memoryDataRef.current = merged;
         setMemoryData(merged);
+
+        const sessionStart = getSessionStart();
+        if (pendingTail) {
+          // 지난번 대화 끝부분을 노트에 반영
+          updateNote(pendingTail.msgs, pendingTail.savedAt).then(ok => {
+            if (!ok) return;
+            if (sessionStart && pendingTail.savedAt >= sessionStart) {
+              memIdxRef.current = pendingTail.end;
+              localStorage.setItem(SESSION_MEMIDX, JSON.stringify({ idx: pendingTail.end, savedAt: Date.now() }));
+            } else {
+              localStorage.removeItem(SESSION_MEMIDX);
+            }
+          });
+        } else if (!merged.note && legacyToText(merged)) {
+          // 예전 방식 기억 → 새 노트로 옮기기 (한 번만)
+          updateNote([], null);
+        }
       }).catch(() => {});
     }
-
     // 세션 데이터 복원 (오후5시~오전5시 범위 내면 유지)
     const sessionStart = getSessionStart();
 
@@ -558,6 +614,7 @@ export default function DalChat({ uid, userNick, onLogout }) {
         const { msgs, savedAt } = JSON.parse(r);
         if (sessionStart && savedAt >= sessionStart && msgs?.length) {
           setMessages(msgs); historyRef.current = msgs;
+          try { const m = localStorage.getItem(SESSION_MEMIDX); if (m) memIdxRef.current = JSON.parse(m).idx || 0; } catch {}
           const lastDal  = [...msgs].reverse().find(m => m.role === "assistant");
           const lastUser = [...msgs].reverse().find(m => m.role === "user");
           if (lastDal)  setMoonBubble(lastDal.content.length > 62 ? lastDal.content.slice(0,59)+"…" : lastDal.content);
@@ -754,110 +811,60 @@ export default function DalChat({ uid, userNick, onLogout }) {
 
 
 
-  // ── 메모리 추출 (비동기, 백그라운드) ─────────────────
-
-  const extractAndSaveMemories = useCallback(async (finalHistory) => {
-
+  // ── 달의 노트 정리 (비동기, 백그라운드) ──────────────
+  // 기존 노트 + 새 대화를 주면 AI가 노트 전체를 다시 정리해서 저장
+  const updateNote = useCallback(async (newMsgs, convoAt) => {
     const uid = uidRef.current;
-    if (!uid) return;
-
-    const convoText = finalHistory.slice(-12)
-      .map(m => (m.role === "user" ? "사용자" : "달") + ": " + m.content)
-      .join("\n");
-
-    const prompt = `다음 대화를 분석해서 JSON만 반환해. 다른 말은 하지 마.
-
-{
-  "fixed": { "name": "이름(확실할 때만, 아니면 null)", "age": "나이(확실할 때만, 아니면 null)", "purpose": "달 찾는 주 목적(하소연/장난/화풀이/대화 중 하나, 불명확하면 null)" },
-  "facts": ["일반 영구 사실(직업·취미 등, 없으면 빈 배열)"],
-  "relation": ["관계 관련 내용(없으면 빈 배열)"],
-  "work": ["직장 관련 내용(없으면 빈 배열)"],
-  "mental": ["감정/심리 패턴(없으면 빈 배열)"],
-  "recent": ["최근 사건/감정/상황(최대 3개, 없으면 빈 배열)"],
-  "prefs": {
-    "items": ["달에게 원하는 말투/성격 변화(없으면 빈 배열)"],
-    "lang": "유저가 쓰는 언어 코드 (ko/zh/en 등, 감지되면 반드시 추출, 모르면 null)",
-    "tone": "유저가 선호하는 달의 톤 (cold/warm/playful 중 하나, 감지 안 되면 null)",
-    "profanity": "유저가 욕설을 쓰는지 여부 (true/false, 모르면 null)"
-  }
-}
-
-대화:
-${convoText}`;
-
+    if (!uid || noteBusyRef.current) return false;
+    noteBusyRef.current = true;
     try {
-
+      const mem     = memoryDataRef.current;
+      const current = mem.note?.text || legacyToText(mem);
+      const convo   = newMsgs.slice(-40)
+        .map(m => (m.role === "user" ? "사용자" : "달") + ": " + m.content)
+        .join("\n");
       const res = await fetch(`${import.meta.env.VITE_API_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-haiku-5-5",
-          max_tokens: 2000,
-          messages: [{ role: "user", content: prompt }]
-        })
+          max_tokens: 4000,
+          output_config: { effort: "medium", format: { type: "json_schema", schema: NOTE_SCHEMA } },
+          messages: [{ role: "user", content: buildNotePrompt(current, convo, fmtDate(convoAt || Date.now())) }],
+        }),
       });
-
-      const data = await res.json();
-      const txt  = (responseText(data) || "{}").replace(/```json|```/g, "").trim();
-      const ext  = JSON.parse(txt);
-      const now  = Date.now();
-
-      const current = memoryDataRef.current;
-      const updated = { ...current };
-
-      // fixed: 기존 값 우선 (덮어쓰지 않음)
-      if (ext.fixed) {
-        const f = ext.fixed;
-        const cf = current.fixed || {};
-        updated.fixed = { ...cf };
-        if (f.name    && !cf.name)    updated.fixed.name    = f.name;
-        if (f.age     && !cf.age)     updated.fixed.age     = f.age;
-        if (f.purpose && !cf.purpose) updated.fixed.purpose = f.purpose;
-        await saveMemoryCategory(uid, 'fixed', updated.fixed);
-      }
-
-      // 카테고리별 누적 저장 헬퍼
-      const mergeItems = async (cat, newItems, limit) => {
-        if (!newItems?.length) return;
-        const existing = new Set(current[cat]?.items || []);
-        newItems.filter(v => v && v.trim && !existing.has(v)).forEach(v => existing.add(v));
-        updated[cat] = { items: [...existing].slice(-limit) };
-        await saveMemoryCategory(uid, cat, updated[cat]);
+      if (!res.ok) return false;
+      const out = JSON.parse(responseText(await res.json()));
+      const text = (out.note || "").trim();
+      if (!text) return false;
+      const note = {
+        text: text.slice(0, NOTE_MAX_LEN),
+        name: out.name?.trim() || mem.note?.name || mem.fixed?.name || null,
+        updatedAt: Date.now(),
       };
-
-      await mergeItems('facts',    ext.facts,    15);
-      await mergeItems('relation', ext.relation, 20);
-      await mergeItems('work',     ext.work,     20);
-      await mergeItems('mental',   ext.mental,   20);
-
-      // prefs: items 누적 + lang/tone/profanity scalar 필드 (최신값 우선)
-      if (ext.prefs) {
-        const cp = current.prefs || { items: [] };
-        const existing = new Set(cp.items || []);
-        (ext.prefs.items || []).filter(v => v && !existing.has(v)).forEach(v => existing.add(v));
-        const merged = { ...cp, items: [...existing].slice(-10) };
-        if (ext.prefs.lang      != null) merged.lang      = ext.prefs.lang;
-        if (ext.prefs.tone      != null) merged.tone      = ext.prefs.tone;
-        if (ext.prefs.profanity != null) merged.profanity = ext.prefs.profanity;
-        updated.prefs = merged;
-        await saveMemoryCategory(uid, 'prefs', merged);
-      }
-
-      // recent: 만료 처리 포함
-      if (ext.recent?.length) {
-        const newItems = ext.recent
-          .filter(e => e && e.trim())
-          .map(content => ({ content: content.trim(), createdAt: now, expiresAt: now + SHORT_TTL }));
-        updated.recent = { items: pruneShort([...(current.recent?.items || []), ...newItems]) };
-        await saveMemoryCategory(uid, 'recent', updated.recent);
-      }
-
+      await saveMemoryCategory(uid, 'note', note);
+      const updated = { ...memoryDataRef.current, note };
       memoryDataRef.current = updated;
       setMemoryData(updated);
-
-    } catch { /* 실패 시 조용히 무시 */ }
-
+      return true;
+    } catch {
+      return false; // 실패하면 다음 기회에 같은 대화로 다시 시도
+    } finally {
+      noteBusyRef.current = false;
+    }
   }, []);
+
+  // 아직 노트에 안 들어간 이번 대화를 정리
+  const flushNote = useCallback((history) => {
+    const end = history.length;
+    const pending = history.slice(memIdxRef.current, end);
+    if (pending.length < 2) return;
+    updateNote(pending, Date.now()).then(ok => {
+      if (!ok) return;
+      memIdxRef.current = end;
+      localStorage.setItem(SESSION_MEMIDX, JSON.stringify({ idx: end, savedAt: Date.now() }));
+    });
+  }, [updateNote]);
 
 
 
@@ -893,9 +900,11 @@ ${convoText}`;
     if (h < DAY_START_H || h >= DAY_END_H) {
       setIsDayMode(false);
       setDayResetMsg(null);
+      flushNote(historyRef.current);
       setMessages([]);
       historyRef.current = [];
-      [SESSION_MSGS, SESSION_COMP, SESSION_DAILY].forEach(k => localStorage.removeItem(k));
+      memIdxRef.current = 0;
+      [SESSION_MSGS, SESSION_COMP, SESSION_DAILY, SESSION_MEMIDX].forEach(k => localStorage.removeItem(k));
       setMoonBubble("오늘 밤엔 참 조용하네.\n뭔 일 있어?");
       setUserBubble("");
       setIsLocked(false);
@@ -962,20 +971,6 @@ ${convoText}`;
       startTypewriter("미안한데 이제 가봐야겠다. 나중에 다시 보자.");
       setIsLocked(true);
       return;
-    }
-
-    // 키워드 감지 → 새 카테고리 있으면 추가 로드
-    const detectedCats = detectCategories(history);
-    const newCats = detectedCats.filter(c => !loadedCatsRef.current.has(c));
-    if (newCats.length && uidRef.current) {
-      try {
-        const extra = await loadMemory(uidRef.current, newCats);
-        newCats.forEach(c => loadedCatsRef.current.add(c));
-        const merged = { ...memoryDataRef.current };
-        newCats.forEach(c => { if (extra[c]) merged[c] = extra[c]; });
-        memoryDataRef.current = merged;
-        setMemoryData(merged);
-      } catch {}
     }
 
     setIsStreaming(true);
@@ -1078,10 +1073,15 @@ ${convoText}`;
       // 스트리밍 완료 → 단락별 타이핑 애니메이션
       startTypewriter(full);
 
-      // 메모리 추출: 1번째 또는 4회마다 (백그라운드)
+      // 달의 노트 정리: 사용자 메시지 5개마다 (백그라운드)
       const userCount = finalHistory.filter(m => m.role === "user").length;
-      if (userCount === 1 || userCount % 4 === 0) {
-        extractAndSaveMemories(finalHistory);
+      if (userCount % NOTE_EVERY === 0) flushNote(finalHistory);
+
+      // 마지막 대화 시각 저장 (오랜만에 왔는지 알기 위해)
+      const nowTs = Date.now();
+      if (uidRef.current && nowTs - metaSavedAtRef.current > META_THROTTLE) {
+        metaSavedAtRef.current = nowTs;
+        saveMemoryCategory(uidRef.current, 'meta', { lastChatAt: nowTs }).catch(() => {});
       }
 
       // 일일 대화 압축: 10회마다
@@ -1111,7 +1111,7 @@ ${convoText}`;
 
     }
 
-  }, [input, isStreaming, startTypewriter, extractAndSaveMemories, compressDailyMem, isLocked, isDayMode]);
+  }, [input, isStreaming, startTypewriter, flushNote, compressDailyMem, isLocked, isDayMode]);
 
 
 
