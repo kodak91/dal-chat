@@ -55,6 +55,8 @@ const NOTE_SCHEMA = {
 
 const DAY_MS = 86400000;
 
+const REFUSAL_MSG = "음... 그 얘긴 내가 같이 하기 좀 어렵다. 다른 얘기 하자.";
+
 function fmtDate(ms) {
   return new Date(ms).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
 }
@@ -977,6 +979,7 @@ export default function DalChat({ uid, userNick, onLogout }) {
     setMoonBubble("");
 
     let full = "";
+    let stopReason = null;
 
     try {
 
@@ -1042,6 +1045,8 @@ export default function DalChat({ uid, userNick, onLogout }) {
 
             if (parsed.type === "message_stop") break outer;
 
+            if (parsed.type === "message_delta" && parsed.delta?.stop_reason) stopReason = parsed.delta.stop_reason;
+
             if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta" && typeof parsed.delta.text === "string") {
 
               full += parsed.delta.text;
@@ -1054,6 +1059,11 @@ export default function DalChat({ uid, userNick, onLogout }) {
 
         }
 
+      }
+
+      // 안전 정책으로 거절된 경우: 잘린 답 대신 달답게 넘김 (같은 말 반복 유도 X)
+      if (stopReason === "refusal") {
+        full = REFUSAL_MSG;
       }
 
       // 빈 응답 방어 (웹서치 후 텍스트 없이 종료된 경우)
