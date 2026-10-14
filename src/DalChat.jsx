@@ -43,7 +43,7 @@ const NOTE_EVERY   = 5;    // 사용자 메시지 5개마다 노트 정리
 const NOTE_MAX_LEN = 3000;
 const META_THROTTLE = 10 * 60 * 1000; // 마지막 대화 시각 저장은 10분에 한 번
 const STYLE_KEEP    = 40;  // 말투 참고용으로 저장하는 사용자 문장 수
-const STYLE_SHOW    = 25;  // 그중 달에게 보여주는 수
+const STYLE_SHOW    = 15;  // 그중 달에게 보여주는 수
 const STYLE_MAX_LEN = 150; // 너무 긴 문장은 말투 샘플에서 제외
 
 const NOTE_SCHEMA = {
@@ -59,6 +59,26 @@ const NOTE_SCHEMA = {
 const DAY_MS = 86400000;
 
 const REFUSAL_MSG = "음... 그 얘긴 내가 같이 하기 좀 어렵다. 다른 얘기 하자.";
+
+// 달 답변 길이: 프롬프트로 150자를 알려주고(dal-personality.txt와 맞출 것),
+// 실제 한도는 넉넉하게 둬서 잘리는 일이 드물게
+const CHAT_MAX_TOKENS = 600;
+
+// 매 답변 직전에 붙는 짧은 리마인더. 감정·태도는 넣지 않고 형식만 (기쁜 순간까지 시큰둥해지지 않게)
+const CHAT_REMINDER = "너는 달. 한 번에 최대 150자, 보통 한두 문장. 해설하지 말고 그냥 말해.";
+
+// 한도에 걸려 잘린 답을 마지막으로 끝난 문장까지만 남김
+function trimToSentence(text) {
+  // 문장부호·ㅋㅎㅠ·줄바꿈, 또는 '다/요/야/지/네' 뒤 띄어쓰기를 문장 끝으로 봄
+  const ends = [...text.matchAll(/[.!?~…]+|ㅋ+|ㅎ+|ㅠ+|ㅜ+|\n|[다요야지네](?=\s)/g)];
+  if (ends.length) {
+    const last = ends[ends.length - 1];
+    const cut = text.slice(0, last.index + last[0].length).trim();
+    if (cut) return cut;
+  }
+  const space = text.lastIndexOf(" ");
+  return space > 0 ? text.slice(0, space).trim() : text;
+}
 
 function fmtDate(ms) {
   return new Date(ms).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
@@ -100,10 +120,6 @@ function mergeStyle(style, msgs) {
   if (!fresh.length) return null;
   const samples = [...(style?.samples || []).filter(t => !fresh.includes(t)), ...fresh].slice(-STYLE_KEEP);
   return { samples, updatedAt: Date.now() };
-}
-
-function avgLen(lines) {
-  return lines.length ? Math.round(lines.reduce((n, t) => n + t.length, 0) / lines.length) : 0;
 }
 
 // 마지막 대화 시각. 예전 사용자는 recent 기억의 가장 늦은 날짜로 대신함
@@ -205,10 +221,7 @@ const buildSystemPrompt = (memoryData, onboarding, dailyMem = [], initTime = nul
   // 이 사람 말투: 실제로 한 말 + 평균 길이
   const samples = (memoryData.style?.samples || []).slice(-STYLE_SHOW);
   if (samples.length) {
-    memSection += `\n\n[이 사람 말투 — 실제로 한 말들]\n${samples.map(t => `- ${t}`).join('\n')}`;
-    memSection += `\n이 사람은 한 번에 평균 ${avgLen(samples)}자 정도로 말해. 너도 그 정도로.`;
-  } else {
-    memSection += `\n\n[이 사람 말투]: 아직 잘 몰라. 지금 대화를 보고 맞춰가. 처음엔 짧고 편하게.`;
+    memSection += `\n\n[이 사람이 실제로 한 말들 — 이 사람을 이해하는 데만 참고. 말투를 따라 하진 마]\n${samples.map(t => `- ${t}`).join('\n')}`;
   }
 
   // 달의 노트 (없으면 예전 방식 기억)
@@ -1035,13 +1048,13 @@ export default function DalChat({ uid, userNick, onLogout }) {
 
           model: "claude-haiku-5-5",
 
-          max_tokens: 2000,
+          max_tokens: CHAT_MAX_TOKENS,
 
           system: buildSystemPrompt(memoryDataRef.current, onboardingRef.current, dailyMemRef.current, initTimeRef.current),
 
           stream: true,
 
-          messages: history.slice(-20),
+          messages: [...history.slice(-20), { role: "system", content: CHAT_REMINDER }],
 
         }),
 
@@ -1106,6 +1119,11 @@ export default function DalChat({ uid, userNick, onLogout }) {
       // 안전 정책으로 거절된 경우: 잘린 답 대신 달답게 넘김 (같은 말 반복 유도 X)
       if (stopReason === "refusal") {
         full = REFUSAL_MSG;
+      }
+
+      // 길이 한도에 걸려 잘린 경우: 끝난 문장까지만
+      if (stopReason === "max_tokens") {
+        full = trimToSentence(full);
       }
 
       // 빈 응답 방어 (웹서치 후 텍스트 없이 종료된 경우)
