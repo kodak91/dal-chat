@@ -24,6 +24,17 @@ const IMG_PERSON="/person.png";
 
 const DAY_START_H = 5;
 const DAY_END_H   = 17;
+
+// 테스트용 낮 모드 끄기: 주소에 ?night 를 붙여 열면 이 브라우저에서만 꺼짐, ?day 로 다시 켬
+const NIGHT_KEY = "dal:dev:night";
+const NIGHT_FORCED = (() => {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    if (q.has("night")) localStorage.setItem(NIGHT_KEY, "1");
+    if (q.has("day"))   localStorage.removeItem(NIGHT_KEY);
+    return localStorage.getItem(NIGHT_KEY) === "1";
+  } catch { return false; }
+})();
 const SLEEP_AT    = 100;
 const LOCK_AT     = 120;
 
@@ -175,6 +186,8 @@ function getSessionStart() {
     const s = new Date(now); s.setHours(DAY_END_H, 0, 0, 0); return s.getTime();
   } else if (h < DAY_START_H) {
     const s = new Date(now); s.setDate(s.getDate() - 1); s.setHours(DAY_END_H, 0, 0, 0); return s.getTime();
+  } else if (NIGHT_FORCED) {
+    const s = new Date(now); s.setHours(DAY_START_H, 0, 0, 0); return s.getTime(); // 낮 모드 끈 테스트: 오늘 낮을 한 세션으로
   }
   return null; // 낮 시간
 }
@@ -550,7 +563,7 @@ export default function DalChat({ uid, userNick, onLogout }) {
 
   const [bubbleKey, setBubbleKey]      = useState(0);
 
-  const [isDayMode, setIsDayMode]      = useState(() => { const h = new Date().getHours(); return h >= DAY_START_H && h < DAY_END_H; });
+  const [isDayMode, setIsDayMode]      = useState(() => { const h = new Date().getHours(); return !NIGHT_FORCED && h >= DAY_START_H && h < DAY_END_H; });
 
   const [dayResetMsg, setDayResetMsg]  = useState(null);
 
