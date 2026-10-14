@@ -1,10 +1,11 @@
 const crypto = require('crypto');
 
-const MODEL      = 'claude-haiku-4-5-20251001';
-const SLEEP_AT   = 40;
-const LOCK_AT    = 50;
+const MODEL      = 'claude-haiku-5-5';
+const SLEEP_AT   = 80;
+const LOCK_AT    = 100;
 const SLEEP_NOTE = '\n\n[참고]: 오늘 대화 많이 했어. 슬슬 졸려와. 자연스럽게 피곤함 드러내도 돼.';
 const LOCK_MSG   = '미안한데 이제 가봐야겠다. 나중에 다시 보자.';
+const EFFORTS    = ['low', 'medium']; // 클라이언트가 고를 수 있는 생각 깊이
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -72,10 +73,20 @@ module.exports = async function handler(req, res) {
 
   try { await setCount(uid, date, count + 1); } catch (e) { console.error('Firebase write error:', e); }
 
-  // 모델 고정 + 40회 이상 졸림 노트 추가
+  // 모델 고정 + SLEEP_AT회 이상 졸림 노트 추가
   const body = { ...req.body, model: MODEL };
+  // 생각 깊이는 기본 low. 노트 정리처럼 꼼꼼해야 하는 요청만 medium 허용
+  const effort = EFFORTS.includes(body.output_config?.effort) ? body.output_config.effort : 'low';
+  body.output_config = { ...body.output_config, effort };
   if (count >= SLEEP_AT && body.system) body.system += SLEEP_NOTE;
-  body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }]; // 웹서치 툴 추가
+  // 달과의 대화(스트리밍): 웹서치 O, 생각 X (즉흥적인 말투 + 토큰을 전부 대답에 쓰도록)
+  // 노트 정리·일기: 웹서치 X, 생각 O
+  if (body.stream) {
+    body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }];
+    body.thinking = { type: 'disabled' };
+  } else {
+    delete body.tools;
+  }
 
   try {
     const upstream = await fetch('https://api.anthropic.com/v1/messages', {
